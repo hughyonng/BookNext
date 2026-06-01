@@ -1,0 +1,4 @@
+-keep class com.booknext.app.data.remote.dto.** { *; }
+-keep class com.booknext.app.data.local.db.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*

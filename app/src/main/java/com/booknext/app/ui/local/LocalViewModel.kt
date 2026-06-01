@@ -1,0 +1,72 @@
+package com.booknext.app.ui.local
+
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+import javax.inject.Inject
+
+data class LocalBook(
+    val path: String,
+    val name: String,
+    val format: String,
+    val size: Long,
+)
+
+@HiltViewModel
+class LocalViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : ViewModel() {
+
+    private val localDir = File(context.filesDir, "local_books")
+    private val _localBooks = MutableStateFlow<List<LocalBook>>(emptyList())
+    val localBooks: StateFlow<List<LocalBook>> = _localBooks
+
+    init {
+        localDir.mkdirs()
+        loadLocalBooks()
+    }
+
+    private fun loadLocalBooks() {
+        val books = localDir.listFiles()
+            ?.filter { it.extension in listOf("epub", "pdf", "txt", "mobi", "azw3") }
+            ?.map { file ->
+                LocalBook(
+                    path = file.absolutePath,
+                    name = file.nameWithoutExtension,
+                    format = file.extension,
+                    size = file.length(),
+                )
+            } ?: emptyList()
+        _localBooks.value = books.sortedByDescending { File(it.path).lastModified() }
+    }
+
+    fun importFile(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val name = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                cursor.moveToFirst()
+                cursor.getString(idx)
+            } ?: "imported_book"
+
+            val destFile = File(localDir, name)
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                destFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            loadLocalBooks()
+        }
+    }
+
+    fun deleteLocal(path: String) {
+        File(path).delete()
+        loadLocalBooks()
+    }
+}
