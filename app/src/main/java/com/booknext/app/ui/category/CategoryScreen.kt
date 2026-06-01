@@ -1,6 +1,8 @@
 package com.booknext.app.ui.category
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
@@ -22,7 +24,7 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CategoryScreen(
     onBookClick: (String) -> Unit,
@@ -36,6 +38,10 @@ fun CategoryScreen(
     var showAddBookSheet by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
+    var selectedFolderForEdit by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var folderToDelete by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
     val prefs = remember {
         EntryPointAccessors.fromApplication(
@@ -48,11 +54,18 @@ fun CategoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(selectedFolder ?: "我的分类") },
+                title = {
+                    if (selectedFolderForEdit != null) Text("已选中 1 项")
+                    else Text(selectedFolder ?: "我的分类")
+                },
                 navigationIcon = {
                     if (selectedFolder != null) {
                         IconButton(onClick = { selectedFolder = null }) {
                             Icon(Icons.Default.ArrowBack, "返回")
+                        }
+                    } else if (selectedFolderForEdit != null) {
+                        IconButton(onClick = { selectedFolderForEdit = null }) {
+                            Icon(Icons.Default.Close, "取消选中")
                         }
                     } else {
                         IconButton(onClick = onMenuClick) {
@@ -61,7 +74,15 @@ fun CategoryScreen(
                     }
                 },
                 actions = {
-                    if (selectedFolder == null) {
+                    if (selectedFolderForEdit != null) {
+                        IconButton(onClick = {
+                            folderToDelete = selectedFolderForEdit
+                            showDeleteConfirm = true
+                        }) {
+                            Icon(Icons.Default.Delete, "删除文件夹",
+                                tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else if (selectedFolder == null) {
                         IconButton(onClick = { showCreateDialog = true }) {
                             Icon(Icons.Default.CreateNewFolder, "新建文件夹")
                         }
@@ -98,54 +119,41 @@ fun CategoryScreen(
                 ) {
                     items(folders) { folder ->
                         val count = allBooks.count { it.category == folder }
-                        var showDeleteConfirm by remember { mutableStateOf(false) }
+                        val isSelected = folder == selectedFolderForEdit
 
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = if (isSelected) CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ) else CardDefaults.cardColors(),
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { selectedFolder = folder }
+                                    .combinedClickable(
+                                        onClick = { selectedFolder = folder },
+                                        onLongClick = {
+                                            selectedFolderForEdit = if (isSelected) null else folder
+                                        },
+                                    )
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Default.Folder, null,
-                                    tint = MaterialTheme.colorScheme.primary)
+                                Icon(
+                                    if (isSelected) Icons.Default.CheckCircle else Icons.Default.Folder,
+                                    null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.primary)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(folder, style = MaterialTheme.typography.bodyLarge)
                                     Text("$count 本书",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                IconButton(onClick = { showDeleteConfirm = true }) {
-                                    Icon(Icons.Default.Delete, null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(20.dp))
-                                }
                                 Icon(Icons.Default.ChevronRight, null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        }
-
-                        if (showDeleteConfirm) {
-                            AlertDialog(
-                                onDismissRequest = { showDeleteConfirm = false },
-                                title = { Text("删除文件夹") },
-                                text = { Text("删除「$folder」？文件夹内的书籍将变为未分类，书籍本身不会被删除。") },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        viewModel.deleteFolder(folder)
-                                        showDeleteConfirm = false
-                                    }) {
-                                        Text("删除", color = MaterialTheme.colorScheme.error)
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showDeleteConfirm = false }) {
-                                        Text("取消")
-                                    }
-                                }
-                            )
                         }
                     }
                 }
@@ -186,6 +194,30 @@ fun CategoryScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm && folderToDelete != null) {
+        val f = folderToDelete!!
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false; folderToDelete = null; selectedFolderForEdit = null },
+            title = { Text("删除文件夹") },
+            text = { Text("删除「$f」？文件夹内的书籍将变为未分类，书籍本身不会被删除。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteFolder(f)
+                    showDeleteConfirm = false
+                    folderToDelete = null
+                    selectedFolderForEdit = null
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false; folderToDelete = null }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     if (showCreateDialog) {

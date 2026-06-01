@@ -91,7 +91,14 @@ class ReaderViewModel @Inject constructor(
             _book.value = entity
             _progress.value = entity.progress
 
-            val cacheFile = File(context.cacheDir, "books/${bookId}.${entity.format}")
+            // 本地文件直接读取
+            if (entity.filePath != null && File(entity.filePath).exists()) {
+                val localFile = File(entity.filePath)
+                deliverFile(entity, localFile)
+                return@launch
+            }
+
+            val cacheFile = File(context.filesDir, "books/${bookId}.${entity.format}")
             if (cacheFile.exists() && cacheFile.length() > 0) {
                 deliverFile(entity, cacheFile)
                 return@launch
@@ -152,7 +159,7 @@ class ReaderViewModel @Inject constructor(
         }
         if (entity.format in listOf("mobi", "azw3")) {
             val bookId = entity.bookId
-            val convertedFile = File(context.cacheDir, "books/${bookId}_converted.epub")
+            val convertedFile = File(context.filesDir, "books/${bookId}_converted.epub")
             if (convertedFile.exists() && convertedFile.length() > 0) {
                 _state.value = ReaderState.Ready(convertedFile, "epub")
                 return

@@ -91,7 +91,22 @@ class BookshelfViewModel @Inject constructor(
                         pageCount = dto.pageCount,
                     )
                 }
-                bookDao.upsertAll(entities)
+                entities.forEach { entity ->
+                    val old = bookDao.getById(entity.bookId)
+                    if (old != null) {
+                        bookDao.upsert(entity.copy(
+                            lastReadAt = old.lastReadAt,
+                            progress = old.progress,
+                            readingPercent = old.readingPercent,
+                            lastReadTime = old.lastReadTime,
+                            totalReadingSeconds = old.totalReadingSeconds,
+                            isFinished = old.isFinished,
+                            isFavorite = old.isFavorite,
+                        ))
+                    } else {
+                        bookDao.upsert(entity)
+                    }
+                }
                 _syncState.value = SyncState.Success
             } catch (e: Exception) {
                 _syncState.value = SyncState.Error(e.message ?: "同步失败")

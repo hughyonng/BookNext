@@ -1,6 +1,7 @@
 package com.booknext.app
 
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -118,6 +119,32 @@ fun MainDrawerScaffold(
     var currentPage by remember { mutableStateOf(DrawerPage.BOOKSHELF) }
     var readerBookId by remember { mutableStateOf<String?>(null) }
     var showSettings by remember { mutableStateOf(false) }
+    var showQuotes by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || drawerState.isOpen) {
+        when {
+            readerBookId != null -> readerBookId = null
+            showQuotes -> showQuotes = false
+            showStats -> showStats = false
+            showSettings -> showSettings = false
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+        }
+    }
+
+    if (showQuotes) {
+        com.booknext.app.ui.quotes.QuotesScreen(
+            onBack = { showQuotes = false },
+        )
+        return
+    }
+
+    if (showStats) {
+        com.booknext.app.ui.stats.StatsScreen(
+            onBack = { showStats = false },
+        )
+        return
+    }
 
     if (showSettings) {
         com.booknext.app.ui.settings.SettingsScreen(
@@ -173,6 +200,9 @@ fun MainDrawerScaffold(
                 DrawerPage.RECENT -> RecentScreen(
                     onBookClick = { readerBookId = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
+                    onNavigateToCloud = { currentPage = DrawerPage.CLOUD },
+                    onNavigateToQuotes = { showQuotes = true },
+                    onNavigateToStats = { showStats = true },
                 )
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },

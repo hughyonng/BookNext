@@ -5,6 +5,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.booknext.app.data.local.db.BookDao
+import com.booknext.app.data.local.db.BookEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -19,11 +21,13 @@ data class LocalBook(
     val name: String,
     val format: String,
     val size: Long,
+    val bookId: String = "",
 )
 
 @HiltViewModel
 class LocalViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val bookDao: BookDao,
 ) : ViewModel() {
 
     private val localDir = File(context.filesDir, "local_books")
@@ -44,6 +48,7 @@ class LocalViewModel @Inject constructor(
                     name = file.nameWithoutExtension,
                     format = file.extension,
                     size = file.length(),
+                    bookId = "local_${file.nameWithoutExtension}",
                 )
             } ?: emptyList()
         _localBooks.value = books.sortedByDescending { File(it.path).lastModified() }
@@ -61,12 +66,31 @@ class LocalViewModel @Inject constructor(
             context.contentResolver.openInputStream(uri)?.use { input ->
                 destFile.outputStream().use { output -> input.copyTo(output) }
             }
+
+            val ext = destFile.extension.lowercase()
+            val bookId = "local_${destFile.nameWithoutExtension}"
+            bookDao.upsert(BookEntity(
+                bookId = bookId,
+                title = destFile.nameWithoutExtension,
+                author = "本地文件",
+                format = ext,
+                filePath = destFile.absolutePath,
+                fileSize = destFile.length(),
+                isDownloaded = true,
+                lastReadTime = System.currentTimeMillis(),
+            ))
+
             loadLocalBooks()
         }
     }
 
     fun deleteLocal(path: String) {
-        File(path).delete()
+        val file = File(path)
+        val bookId = "local_${file.nameWithoutExtension}"
+        file.delete()
+        viewModelScope.launch(Dispatchers.IO) {
+            bookDao.deleteById(bookId)
+        }
         loadLocalBooks()
     }
 }
