@@ -61,4 +61,7 @@ interface BookDao {
 
     @Query("SELECT * FROM books WHERE isFinished = 1 ORDER BY lastReadAt DESC")
     fun observeFinished(): Flow<List<BookEntity>>
+
+    @Query("UPDATE books SET isFavorite = NOT isFavorite WHERE bookId = :id")
+    suspend fun toggleFavorite(id: String)
 }

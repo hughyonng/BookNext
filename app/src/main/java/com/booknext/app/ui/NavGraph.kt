@@ -40,6 +40,7 @@ fun NavGraph(startDestination: String = Routes.LOGIN) {
             BookshelfScreen(
                 onBookClick = { book -> navController.navigate(Routes.reader(book.bookId)) },
                 onMenuClick = { navController.navigate(Routes.SETTINGS) },
+                onUploadClick = { navController.navigate(Routes.UPLOAD) },
             )
         }
         composable(

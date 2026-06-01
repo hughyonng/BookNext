@@ -235,7 +235,7 @@ private fun CloudBookList(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Card(
-                        modifier = Modifier.size(width = 44.dp, height = 60.dp),
+                        modifier = Modifier.size(width = 38.dp, height = 52.dp),
                         elevation = CardDefaults.cardElevation(2.dp),
                     ) {
                         if (book.hasCover) {

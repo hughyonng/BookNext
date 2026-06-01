@@ -113,7 +113,7 @@ fun RecentScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Card(
-                                modifier = Modifier.size(width = 52.dp, height = 70.dp),
+                                modifier = Modifier.size(width = 44.dp, height = 60.dp),
                                 elevation = CardDefaults.cardElevation(2.dp),
                             ) {
                                 if (book.hasCover) {
@@ -250,7 +250,7 @@ private fun RecentDetailPage(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Card(
-                                modifier = Modifier.size(width = 52.dp, height = 70.dp),
+                                modifier = Modifier.size(width = 44.dp, height = 60.dp),
                                 elevation = CardDefaults.cardElevation(2.dp),
                             ) {
                                 if (book.hasCover) {

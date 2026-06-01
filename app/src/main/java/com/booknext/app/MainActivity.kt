@@ -207,6 +207,7 @@ fun MainDrawerScaffold(
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },
                     onMenuClick = { scope.launch { drawerState.open() } },
+                    onUploadClick = { currentPage = DrawerPage.CLOUD },
                 )
                 DrawerPage.CATEGORY -> CategoryScreen(
                     onBookClick = { readerBookId = it },

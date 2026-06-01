@@ -148,6 +148,19 @@ class BookshelfViewModel @Inject constructor(
             } catch (_: Exception) {}
         }
     }
+
+    fun deleteBook(bookId: String) {
+        viewModelScope.launch {
+            try {
+                apiClient.api().deleteBook(bookId)
+            } catch (_: Exception) {}
+            bookDao.deleteById(bookId)
+        }
+    }
+
+    fun toggleFavorite(bookId: String) {
+        viewModelScope.launch { bookDao.toggleFavorite(bookId) }
+    }
 }
 
 sealed class SyncState {
