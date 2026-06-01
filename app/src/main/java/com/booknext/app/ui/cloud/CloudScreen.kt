@@ -1,8 +1,11 @@
 package com.booknext.app.ui.cloud
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,7 +29,7 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CloudScreen(
     onMenuClick: () -> Unit,
@@ -36,6 +40,10 @@ fun CloudScreen(
     val state by viewModel.state.collectAsState()
     var selectedFolder by remember { mutableStateOf<CloudFolder?>(null) }
     var showStorageInfo by remember { mutableStateOf(false) }
+    var selectedBooks by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedFolders by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var sortAsc by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val prefs = remember {
@@ -48,38 +56,86 @@ fun CloudScreen(
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { uploadViewModel.onFileSelected(context, it) }
-    }
+    ) { uri -> uri?.let { uploadViewModel.onFileSelected(context, it) } }
+
+    val isFolderMode = selectedFolder == null
+    val hasSelection = selectedBooks.isNotEmpty() || selectedFolders.isNotEmpty()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(selectedFolder?.displayName ?: "我的云盘")
+                    if (hasSelection) {
+                        Text("已选 ${selectedBooks.size + selectedFolders.size} 项")
+                    } else {
+                        Text(selectedFolder?.displayName ?: "我的云盘")
+                    }
                 },
                 navigationIcon = {
-                    if (selectedFolder != null) {
-                        IconButton(onClick = { selectedFolder = null }) {
-                            Icon(Icons.Default.ArrowBack, "返回")
-                        }
-                    } else {
-                        IconButton(onClick = onMenuClick) {
+                    when {
+                        hasSelection -> IconButton(onClick = {
+                            selectedBooks = emptySet(); selectedFolders = emptySet()
+                        }) { Icon(Icons.Default.Close, "取消选择") }
+                        selectedFolder != null -> IconButton(onClick = {
+                            selectedFolder = null
+                        }) { Icon(Icons.Default.ArrowBack, "返回") }
+                        else -> IconButton(onClick = onMenuClick) {
                             Icon(Icons.Default.Menu, "菜单")
                         }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { filePicker.launch("*/*") }) {
-                        Icon(Icons.Default.Upload, "上传")
+                    if (hasSelection) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, "删除",
+                                tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        IconButton(onClick = { filePicker.launch("*/*") }) {
+                            Icon(Icons.Default.Upload, "上传")
+                        }
+                        IconButton(onClick = { viewModel.load() }) {
+                            Icon(Icons.Default.Refresh, "刷新")
+                        }
+                        IconButton(onClick = { showStorageInfo = true }) {
+                            Icon(Icons.Default.Info, "存储信息")
+                        }
+                        var showCloudMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { showCloudMenu = true }) {
+                            Icon(Icons.Default.MoreVert, "更多")
+                        }
+                        DropdownMenu(
+                            expanded = showCloudMenu,
+                            onDismissRequest = { showCloudMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("排序") },
+                                onClick = {
+                                    showCloudMenu = false
+                                    sortAsc = !sortAsc
+                                    viewModel.load()
+                                },
+                                leadingIcon = {
+                                    Icon(if (sortAsc) Icons.Default.ArrowUpward
+                                    else Icons.Default.ArrowDownward, null)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("全选") },
+                                onClick = {
+                                    showCloudMenu = false
+                                    if (isFolderMode) {
+                                        val s = state as? CloudUiState.Ready
+                                        selectedFolders = s?.folders?.map { it.name }?.toSet() ?: emptySet()
+                                    } else {
+                                        selectedBooks = selectedFolder?.books?.map { it.bookId }?.toSet() ?: emptySet()
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Default.SelectAll, null) },
+                            )
+                        }
                     }
-                    IconButton(onClick = { viewModel.load() }) {
-                        Icon(Icons.Default.Refresh, "刷新")
-                    }
-                    IconButton(onClick = { showStorageInfo = true }) {
-                        Icon(Icons.Default.Info, "存储信息")
-                    }
-                }
+                },
             )
         }
     ) { padding ->
@@ -90,7 +146,6 @@ fun CloudScreen(
                     CircularProgressIndicator()
                 }
             }
-
             is CloudUiState.Error -> {
                 Box(Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center) {
@@ -101,13 +156,24 @@ fun CloudScreen(
                     }
                 }
             }
-
             is CloudUiState.Ready -> {
                 if (selectedFolder == null) {
                     CloudFolderList(
                         folders = s.folders,
                         padding = padding,
-                        onFolderClick = { selectedFolder = it },
+                        selectedFolders = selectedFolders,
+                        onFolderClick = { folder ->
+                            if (selectedFolders.isNotEmpty()) {
+                                selectedFolders = if (selectedFolders.contains(folder.name))
+                                    selectedFolders - folder.name
+                                else selectedFolders + folder.name
+                            } else {
+                                selectedFolder = folder
+                            }
+                        },
+                        onFolderLongClick = { folder ->
+                            selectedFolders = selectedFolders + folder.name
+                        },
                     )
                 } else {
                     CloudBookList(
@@ -115,12 +181,46 @@ fun CloudScreen(
                         baseUrl = baseUrl,
                         apiKey = apiKey,
                         padding = padding,
-                        onBookClick = onBookClick,
-                        onDeleteBook = { viewModel.deleteBook(it) },
+                        selectedBooks = selectedBooks,
+                        onBookClick = { bookId ->
+                            if (selectedBooks.isNotEmpty()) {
+                                selectedBooks = if (selectedBooks.contains(bookId))
+                                    selectedBooks - bookId
+                                else selectedBooks + bookId
+                            } else {
+                                onBookClick(bookId)
+                            }
+                        },
+                        onBookLongClick = { bookId ->
+                            selectedBooks = selectedBooks + bookId
+                        },
                     )
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        val count = selectedBooks.size + selectedFolders.size
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除确认") },
+            text = { Text("确认删除选中的 $count 项？此操作不可恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedBooks.forEach { viewModel.deleteBook(it) }
+                    selectedFolders.forEach { folderName ->
+                        val folder = (state as? CloudUiState.Ready)?.folders?.find { it.name == folderName }
+                        folder?.books?.forEach { viewModel.deleteBook(it.bookId) }
+                    }
+                    selectedBooks = emptySet(); selectedFolders = emptySet()
+                    showDeleteConfirm = false
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
     }
 
     if (showStorageInfo) {
@@ -133,9 +233,7 @@ fun CloudScreen(
                     if (s != null) {
                         val maxBytes = 100L * 1024 * 1024 * 1024
                         LinearProgressIndicator(
-                            progress = {
-                                (s.totalBytes.toFloat() / maxBytes).coerceIn(0f, 1f)
-                            },
+                            progress = { (s.totalBytes.toFloat() / maxBytes).coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(4.dp))
@@ -162,11 +260,14 @@ fun CloudScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CloudFolderList(
     folders: List<CloudFolder>,
     padding: PaddingValues,
+    selectedFolders: Set<String>,
     onFolderClick: (CloudFolder) -> Unit,
+    onFolderLongClick: (CloudFolder) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -174,10 +275,17 @@ private fun CloudFolderList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(folders, key = { it.name }) { folder ->
+            val isSelected = selectedFolders.contains(folder.name)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onFolderClick(folder) },
+                    .combinedClickable(
+                        onClick = { onFolderClick(folder) },
+                        onLongClick = { onFolderLongClick(folder) },
+                    ),
+                border = if (isSelected) {
+                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                } else null,
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -186,51 +294,62 @@ private fun CloudFolderList(
                 ) {
                     Icon(
                         if (folder.name == "__root__") Icons.Default.FolderOpen
-                        else Icons.Default.Folder,
-                        null,
+                        else Icons.Default.Folder, null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp),
                     )
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(folder.displayName,
-                            style = MaterialTheme.typography.bodyLarge)
+                        Text(folder.displayName, style = MaterialTheme.typography.bodyLarge)
                         Text(
                             "${folder.books.size} 本 · ${formatSize(folder.books.sumOf { it.fileSize })}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Icon(Icons.Default.ChevronRight, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (isSelected) {
+                        Icon(Icons.Default.Check, null,
+                            tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Icon(Icons.Default.ChevronRight, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CloudBookList(
     books: List<BookEntity>,
     baseUrl: String,
     apiKey: String,
     padding: PaddingValues,
+    selectedBooks: Set<String>,
     onBookClick: (String) -> Unit,
-    onDeleteBook: (String) -> Unit,
+    onBookLongClick: (String) -> Unit,
 ) {
-    var bookToDelete by remember { mutableStateOf<BookEntity?>(null) }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(books, key = { it.bookId }) { book ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            val isSelected = selectedBooks.contains(book.bookId)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = { onBookClick(book.bookId) },
+                        onLongClick = { onBookLongClick(book.bookId) },
+                    ),
+                border = if (isSelected) {
+                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                } else null,
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onBookClick(book.bookId) }
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -246,56 +365,35 @@ private fun CloudBookList(
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
-                            Box(Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(book.format.uppercase(), fontSize = 9.sp)
                             }
                         }
                     }
-
                     Column(modifier = Modifier.weight(1f)) {
                         Text(book.title, maxLines = 2,
                             style = MaterialTheme.typography.bodyMedium)
-                        Text(book.format.uppercase() + " · " + formatSize(book.fileSize),
+                        Text(
+                            book.format.uppercase() + " · " + formatSize(book.fileSize),
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-
-                    IconButton(onClick = { bookToDelete = book }) {
-                        Icon(Icons.Default.Delete, null,
-                            tint = MaterialTheme.colorScheme.error,
+                    if (isSelected) {
+                        Icon(Icons.Default.Check, null,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp))
                     }
                 }
             }
         }
     }
-
-    bookToDelete?.let { book ->
-        AlertDialog(
-            onDismissRequest = { bookToDelete = null },
-            title = { Text("删除书籍") },
-            text = { Text("从云端删除《${book.title}》？此操作不可恢复。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteBook(book.bookId)
-                    bookToDelete = null
-                }) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { bookToDelete = null }) { Text("取消") }
-            }
-        )
-    }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, fontSize = 13.sp)
     }
 }

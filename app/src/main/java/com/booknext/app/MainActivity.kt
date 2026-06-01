@@ -23,6 +23,7 @@ import com.booknext.app.ui.common.BookNextTheme
 import com.booknext.app.ui.drawer.DrawerContent
 import com.booknext.app.ui.drawer.DrawerPage
 import com.booknext.app.ui.local.LocalScreen
+import com.booknext.app.ui.onlinelibrary.OnlineLibraryScreen
 import com.booknext.app.ui.recent.RecentScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
@@ -81,6 +82,7 @@ class MainActivity : FragmentActivity() {
                         )
                         AppState.LOGIN -> com.booknext.app.ui.login.LoginScreen(
                             onLoginSuccess = { appState = AppState.MAIN },
+                            onBack = { appState = AppState.WELCOME },
                         )
                         AppState.MAIN -> MainDrawerScaffold(
                             isLoggedIn = isLoggedIn || appState != AppState.WELCOME,
@@ -200,9 +202,10 @@ fun MainDrawerScaffold(
                 DrawerPage.RECENT -> RecentScreen(
                     onBookClick = { readerBookId = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
-                    onNavigateToCloud = { currentPage = DrawerPage.CLOUD },
-                    onNavigateToQuotes = { showQuotes = true },
+                    onNavigateToBookmarks = { showQuotes = true },
+                    onNavigateToNotes = { showQuotes = true },
                     onNavigateToStats = { showStats = true },
+                    onNavigateToOnlineLibrary = { currentPage = DrawerPage.ONLINE_LIBRARY },
                 )
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },
@@ -220,6 +223,10 @@ fun MainDrawerScaffold(
                 DrawerPage.CLOUD -> CloudScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onBookClick = { readerBookId = it },
+                )
+                DrawerPage.ONLINE_LIBRARY -> OnlineLibraryScreen(
+                    onBack = { currentPage = DrawerPage.RECENT },
+                    onMenuClick = { scope.launch { drawerState.open() } },
                 )
             }
         }

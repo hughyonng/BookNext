@@ -6,4 +6,5 @@ enum class DrawerPage {
     CATEGORY,
     LOCAL,
     CLOUD,
+    ONLINE_LIBRARY,
 }

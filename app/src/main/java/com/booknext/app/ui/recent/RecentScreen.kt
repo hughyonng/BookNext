@@ -32,9 +32,10 @@ private const val MAX_SUMMARY_BOOKS = 5
 fun RecentScreen(
     onBookClick: (String) -> Unit,
     onMenuClick: () -> Unit,
-    onNavigateToCloud: () -> Unit = {},
-    onNavigateToQuotes: () -> Unit = {},
+    onNavigateToBookmarks: () -> Unit = {},
+    onNavigateToNotes: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
+    onNavigateToOnlineLibrary: () -> Unit = {},
     viewModel: BookshelfViewModel = hiltViewModel(),
 ) {
     val recentBooks by viewModel.recentBooks.collectAsState()
@@ -150,19 +151,28 @@ fun RecentScreen(
 
             item {
                 EntryCard(
-                    icon = Icons.Default.Cloud,
+                    icon = Icons.Default.Language,
                     title = "网上书库",
-                    desc = "浏览云端书库，下载更多书籍",
-                    onClick = onNavigateToCloud,
+                    desc = "免费电子书资源，一键访问",
+                    onClick = onNavigateToOnlineLibrary,
                 )
             }
 
             item {
                 EntryCard(
                     icon = Icons.Default.Bookmark,
-                    title = "书签与摘抄",
-                    desc = "查看标注、笔记和摘抄记录",
-                    onClick = onNavigateToQuotes,
+                    title = "书签",
+                    desc = "阅读进度标记，快速跳转",
+                    onClick = onNavigateToBookmarks,
+                )
+            }
+
+            item {
+                EntryCard(
+                    icon = Icons.Default.Edit,
+                    title = "摘抄",
+                    desc = "标注、笔记和高亮记录",
+                    onClick = onNavigateToNotes,
                 )
             }
 

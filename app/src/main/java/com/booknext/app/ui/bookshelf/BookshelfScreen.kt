@@ -33,7 +33,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
-enum class SortOrder { TITLE, AUTHOR, UPLOAD_TIME, LAST_READ }
+enum class SortOrder { TITLE, AUTHOR, UPLOAD_TIME, LAST_READ, ONLINE_ONLY, LOCAL_ONLY }
 enum class LayoutMode { GRID_3, GRID_4, LIST }
 
 @EntryPoint
@@ -75,11 +75,18 @@ fun BookshelfScreen(
     val folders by viewModel.folders.collectAsState()
 
     val sortedBooks = remember(books, sortOrder) {
+        val filtered = when (sortOrder) {
+            SortOrder.ONLINE_ONLY -> books.filter { it.filePath == null }
+            SortOrder.LOCAL_ONLY -> books.filter { it.filePath != null }
+            else -> books
+        }
         when (sortOrder) {
-            SortOrder.TITLE -> books.sortedBy { it.title }
-            SortOrder.AUTHOR -> books.sortedBy { it.author }
-            SortOrder.UPLOAD_TIME -> books.sortedByDescending { it.uploadTime }
-            SortOrder.LAST_READ -> books.sortedByDescending { it.lastReadAt }
+            SortOrder.TITLE -> filtered.sortedBy { it.title }
+            SortOrder.AUTHOR -> filtered.sortedBy { it.author }
+            SortOrder.UPLOAD_TIME -> filtered.sortedByDescending { it.uploadTime }
+            SortOrder.LAST_READ -> filtered.sortedByDescending { it.lastReadAt }
+            SortOrder.ONLINE_ONLY -> filtered.sortedByDescending { it.uploadTime }
+            SortOrder.LOCAL_ONLY -> filtered.sortedByDescending { it.uploadTime }
         }
     }
 
@@ -353,11 +360,38 @@ fun BookshelfScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("排序方式", style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 8.dp))
+                Text("排序", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp))
                 listOf(
                     SortOrder.UPLOAD_TIME to "上传时间",
                     SortOrder.LAST_READ to "最近阅读",
                     SortOrder.TITLE to "书名",
                     SortOrder.AUTHOR to "作者",
+                ).forEach { (order, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { sortOrder = order; showSortSheet = false }
+                            .padding(vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        if (sortOrder == order) {
+                            Icon(Icons.Default.Check, null,
+                                tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    HorizontalDivider()
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("筛选", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp))
+                listOf(
+                    SortOrder.ONLINE_ONLY to "仅在线",
+                    SortOrder.LOCAL_ONLY to "仅本地",
                 ).forEach { (order, label) ->
                     Row(
                         modifier = Modifier
