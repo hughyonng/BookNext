@@ -26,6 +26,8 @@ class LoginViewModel @Inject constructor(
     private val prefs: UserPreferences,
 ) : ViewModel() {
 
+    private val client = OkHttpClient()
+
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state
 
@@ -44,7 +46,7 @@ class LoginViewModel @Inject constructor(
             try {
                 val api = Retrofit.Builder()
                     .baseUrl("${url}/")
-                    .client(OkHttpClient())
+                    .client(client)
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
                     .create(BookNextApi::class.java)
