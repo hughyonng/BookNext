@@ -14,8 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import com.booknext.app.data.local.prefs.UserPreferences
-import com.booknext.app.ui.NavGraph
-import com.booknext.app.ui.Routes
 import com.booknext.app.ui.bookshelf.BookshelfScreen
 import com.booknext.app.ui.category.CategoryScreen
 import com.booknext.app.ui.cloud.CloudScreen
