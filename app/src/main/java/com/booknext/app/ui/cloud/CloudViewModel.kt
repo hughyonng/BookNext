@@ -1,13 +1,19 @@
 package com.booknext.app.ui.cloud
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.booknext.app.data.local.db.BookDao
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.remote.ApiClient
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.RequestBody
+import java.io.File
 import javax.inject.Inject
 
 data class CloudFolder(
@@ -104,6 +110,42 @@ class CloudViewModel @Inject constructor(
                 load()
             } catch (_: Exception) {
             }
+        }
+    }
+
+    fun downloadBooks(context: Context, books: List<BookEntity>, baseUrl: String, apiKey: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val localDir = File(context.filesDir, "local_books")
+            localDir.mkdirs()
+            val client = OkHttpClient()
+            books.forEach { book ->
+                try {
+                    val url = "${baseUrl}/api/books/${book.bookId}/download?k=$apiKey"
+                    val ext = book.format.ifEmpty { "epub" }
+                    val safeName = book.title.replace(Regex("[/\\\\:*?\"<>|]"), "_")
+                    val destFile = File(localDir, "$safeName.$ext")
+                    if (destFile.exists()) return@forEach
+                    val request = okhttp3.Request.Builder().url(url).build()
+                    val response = client.newCall(request).execute()
+                    response.body?.byteStream()?.use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    bookDao.upsert(book.copy(
+                        filePath = destFile.absolutePath,
+                        isDownloaded = true,
+                    ))
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun moveBook(bookId: String, folderName: String) {
+        viewModelScope.launch {
+            try {
+                val body = RequestBody.create("text/plain".toMediaType(), folderName)
+                apiClient.api().updateBook(id = bookId, category = body)
+                bookDao.updateCategory(bookId, folderName)
+            } catch (_: Exception) {}
         }
     }
 }

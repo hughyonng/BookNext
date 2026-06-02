@@ -1,5 +1,8 @@
 package com.booknext.app.ui.bookshelf
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -26,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.local.prefs.UserPreferences
+import com.booknext.app.ui.local.LocalViewModel
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -73,6 +77,10 @@ fun BookshelfScreen(
     var showMenu by remember { mutableStateOf(false) }
 
     val folders by viewModel.folders.collectAsState()
+    val localViewModel: LocalViewModel = hiltViewModel()
+    val importFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? -> uri?.let { localViewModel.importFile(context, it) } }
 
     val sortedBooks = remember(books, sortOrder) {
         val filtered = when (sortOrder) {
@@ -193,6 +201,14 @@ fun BookshelfScreen(
                                 text = { Text("刷新书库") },
                                 onClick = { showMenu = false; viewModel.syncBooks() },
                                 leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("导入本地书籍") },
+                                onClick = {
+                                    showMenu = false
+                                    importFilePicker.launch("*/*")
+                                },
+                                leadingIcon = { Icon(Icons.Default.FileOpen, null) },
                             )
                             DropdownMenuItem(
                                 text = { Text("全选") },

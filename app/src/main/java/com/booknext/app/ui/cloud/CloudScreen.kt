@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,6 +45,7 @@ fun CloudScreen(
     var selectedFolders by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var sortAsc by remember { mutableStateOf(false) }
+    var showFolderSheet by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val prefs = remember {
@@ -60,6 +62,10 @@ fun CloudScreen(
 
     val isFolderMode = selectedFolder == null
     val hasSelection = selectedBooks.isNotEmpty() || selectedFolders.isNotEmpty()
+
+    val folderNames = remember(state) {
+        (state as? CloudUiState.Ready)?.folders?.map { it.name }?.filter { it != "__root__" } ?: emptyList()
+    }
 
     Scaffold(
         topBar = {
@@ -86,6 +92,18 @@ fun CloudScreen(
                 },
                 actions = {
                     if (hasSelection) {
+                        IconButton(onClick = {
+                            val s = state as? CloudUiState.Ready ?: return@IconButton
+                            val all = s.folders.flatMap { it.books }
+                            viewModel.downloadBooks(context, all.filter { it.bookId in selectedBooks }, baseUrl, apiKey)
+                        }) {
+                            Icon(Icons.Default.Download, "下载")
+                        }
+                        if (selectedBooks.isNotEmpty() && folderNames.isNotEmpty()) {
+                            IconButton(onClick = { showFolderSheet = true }) {
+                                Icon(Icons.Default.DriveFileMove, "移动")
+                            }
+                        }
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(Icons.Default.Delete, "删除",
                                 tint = MaterialTheme.colorScheme.error)
@@ -94,11 +112,13 @@ fun CloudScreen(
                         IconButton(onClick = { filePicker.launch("*/*") }) {
                             Icon(Icons.Default.Upload, "上传")
                         }
-                        IconButton(onClick = { viewModel.load() }) {
-                            Icon(Icons.Default.Refresh, "刷新")
-                        }
-                        IconButton(onClick = { showStorageInfo = true }) {
-                            Icon(Icons.Default.Info, "存储信息")
+                        IconButton(onClick = {
+                            val s = state as? CloudUiState.Ready ?: return@IconButton
+                            val ids = if (isFolderMode) s.folders.flatMap { it.books }.map { it.bookId }.toSet()
+                            else selectedFolder?.books?.map { it.bookId }?.toSet() ?: emptySet()
+                            viewModel.downloadBooks(context, s.folders.flatMap { it.books }.filter { it.bookId in ids }, baseUrl, apiKey)
+                        }) {
+                            Icon(Icons.Default.Download, "下载")
                         }
                         var showCloudMenu by remember { mutableStateOf(false) }
                         IconButton(onClick = { showCloudMenu = true }) {
@@ -109,7 +129,12 @@ fun CloudScreen(
                             onDismissRequest = { showCloudMenu = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("排序") },
+                                text = { Text("存储信息") },
+                                onClick = { showCloudMenu = false; showStorageInfo = true },
+                                leadingIcon = { Icon(Icons.Default.Info, null) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("排序方式") },
                                 onClick = {
                                     showCloudMenu = false
                                     sortAsc = !sortAsc
@@ -132,6 +157,11 @@ fun CloudScreen(
                                     }
                                 },
                                 leadingIcon = { Icon(Icons.Default.SelectAll, null) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("刷新") },
+                                onClick = { showCloudMenu = false; viewModel.load() },
+                                leadingIcon = { Icon(Icons.Default.Refresh, null) },
                             )
                         }
                     }
@@ -210,8 +240,8 @@ fun CloudScreen(
                 TextButton(onClick = {
                     selectedBooks.forEach { viewModel.deleteBook(it) }
                     selectedFolders.forEach { folderName ->
-                        val folder = (state as? CloudUiState.Ready)?.folders?.find { it.name == folderName }
-                        folder?.books?.forEach { viewModel.deleteBook(it.bookId) }
+                        val f = (state as? CloudUiState.Ready)?.folders?.find { it.name == folderName }
+                        f?.books?.forEach { viewModel.deleteBook(it.bookId) }
                     }
                     selectedBooks = emptySet(); selectedFolders = emptySet()
                     showDeleteConfirm = false
@@ -257,6 +287,36 @@ fun CloudScreen(
                 TextButton(onClick = { showStorageInfo = false }) { Text("关闭") }
             }
         )
+    }
+
+    if (showFolderSheet && selectedBooks.isNotEmpty()) {
+        ModalBottomSheet(onDismissRequest = { showFolderSheet = false }) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("移动到分组",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 12.dp))
+                folderNames.forEach { name ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedBooks.forEach { viewModel.moveBook(it, name) }
+                                selectedBooks = emptySet()
+                                showFolderSheet = false
+                            }
+                            .padding(vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Default.Folder, null,
+                            tint = MaterialTheme.colorScheme.primary)
+                        Text(name, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    HorizontalDivider()
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
     }
 }
 

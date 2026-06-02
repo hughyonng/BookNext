@@ -54,7 +54,7 @@ fun WelcomeScreen(
             onClick = onLogin,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Text("连接我的云端书库", fontSize = 16.sp)
+            Text("登录我的云端书库", fontSize = 16.sp)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -69,7 +69,7 @@ fun WelcomeScreen(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            "连接云端后可访问你在 Hugging Face 上的私有书库\n数据完全归属你自己的账号",
+            "登录云端后可访问你在 Hugging Face 上的私有书库\n数据完全归属你自己的账号",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

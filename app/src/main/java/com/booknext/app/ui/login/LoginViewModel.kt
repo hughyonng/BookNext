@@ -56,7 +56,7 @@ class LoginViewModel @Inject constructor(
                     _state.value = _state.value.copy(error = "密钥无效，请检查后重试")
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(error = "连接失败：${e.message}")
+                _state.value = _state.value.copy(error = "登录失败：${e.message}")
             } finally {
                 _state.value = _state.value.copy(loading = false)
             }

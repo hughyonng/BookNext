@@ -22,7 +22,7 @@ fun LoginScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("连接服务器") },
+                title = { Text("登录服务器") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, "返回")
@@ -70,7 +70,7 @@ fun LoginScreen(
                 enabled = !state.loading,
             ) {
                 if (state.loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                else Text("连接")
+                else Text("登录")
             }
         }
     }

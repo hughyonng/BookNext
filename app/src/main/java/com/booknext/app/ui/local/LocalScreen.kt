@@ -3,7 +3,8 @@ package com.booknext.app.ui.local
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,9 +18,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LocalScreen(
     onBookClick: (String) -> Unit,
@@ -28,6 +28,7 @@ fun LocalScreen(
 ) {
     val localBooks by viewModel.localBooks.collectAsState()
     val context = LocalContext.current
+    var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -38,15 +39,46 @@ fun LocalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("本地文件") },
+                title = {
+                    if (selectedPaths.isNotEmpty()) {
+                        Text("已选 ${selectedPaths.size} 项")
+                    } else {
+                        Text("本地文件")
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, "菜单")
+                    if (selectedPaths.isNotEmpty()) {
+                        IconButton(onClick = { selectedPaths = emptySet() }) {
+                            Icon(Icons.Default.Close, "取消选择")
+                        }
+                    } else {
+                        IconButton(onClick = onMenuClick) {
+                            Icon(Icons.Default.Menu, "菜单")
+                        }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { filePicker.launch("*/*") }) {
-                        Icon(Icons.Default.Add, "导入文件")
+                    if (selectedPaths.isNotEmpty()) {
+                        IconButton(onClick = {
+                            selectedPaths.forEach { path ->
+                                val book = localBooks.find { it.path == path } ?: return@forEach
+                                viewModel.toggleFavorite(book.bookId)
+                            }
+                            selectedPaths = emptySet()
+                        }) {
+                            Icon(Icons.Default.Star, "收藏")
+                        }
+                        IconButton(onClick = {
+                            selectedPaths.forEach { viewModel.deleteLocal(it) }
+                            selectedPaths = emptySet()
+                        }) {
+                            Icon(Icons.Default.Delete, "删除",
+                                tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        IconButton(onClick = { filePicker.launch("*/*") }) {
+                            Icon(Icons.Default.Add, "导入文件")
+                        }
                     }
                 }
             )
@@ -70,11 +102,31 @@ fun LocalScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(localBooks, key = { it.path }) { book ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    val isSelected = selectedPaths.contains(book.path)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = {
+                                    if (selectedPaths.isNotEmpty()) {
+                                        selectedPaths = if (isSelected)
+                                            selectedPaths - book.path
+                                        else selectedPaths + book.path
+                                    } else {
+                                        onBookClick(book.bookId)
+                                    }
+                                },
+                                onLongClick = {
+                                    selectedPaths = selectedPaths + book.path
+                                },
+                            ),
+                        border = if (isSelected) {
+                            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                        } else null,
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onBookClick(book.bookId) }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -86,8 +138,10 @@ fun LocalScreen(
                                 Text(book.format.uppercase() + " · " + formatSize(book.size),
                                     fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            IconButton(onClick = { viewModel.deleteLocal(book.path) }) {
-                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp))
                             }
                         }
                     }

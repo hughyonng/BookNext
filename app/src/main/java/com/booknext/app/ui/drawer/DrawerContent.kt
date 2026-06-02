@@ -64,7 +64,7 @@ fun DrawerContent(
                             shape = MaterialTheme.shapes.small,
                             color = Color(0xFF4CAF50),
                         ) {
-                            Text("  已连接  ",
+                            Text("  已登录  ",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,

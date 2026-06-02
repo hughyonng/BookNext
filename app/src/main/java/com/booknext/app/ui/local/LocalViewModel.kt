@@ -93,4 +93,8 @@ class LocalViewModel @Inject constructor(
         }
         loadLocalBooks()
     }
+
+    fun toggleFavorite(bookId: String) {
+        viewModelScope.launch { bookDao.toggleFavorite(bookId) }
+    }
 }

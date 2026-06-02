@@ -36,6 +36,7 @@ fun RecentScreen(
     onNavigateToNotes: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
     onNavigateToOnlineLibrary: () -> Unit = {},
+    onNavigateToFavorites: () -> Unit = {},
     viewModel: BookshelfViewModel = hiltViewModel(),
 ) {
     val recentBooks by viewModel.recentBooks.collectAsState()
@@ -173,6 +174,15 @@ fun RecentScreen(
                     title = "摘抄",
                     desc = "标注、笔记和高亮记录",
                     onClick = onNavigateToNotes,
+                )
+            }
+
+            item {
+                EntryCard(
+                    icon = Icons.Default.Star,
+                    title = "我的收藏",
+                    desc = "收藏的好书，快速访问",
+                    onClick = onNavigateToFavorites,
                 )
             }
 

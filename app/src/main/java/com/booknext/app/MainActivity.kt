@@ -206,6 +206,7 @@ fun MainDrawerScaffold(
                     onNavigateToNotes = { showQuotes = true },
                     onNavigateToStats = { showStats = true },
                     onNavigateToOnlineLibrary = { currentPage = DrawerPage.ONLINE_LIBRARY },
+                    onNavigateToFavorites = { currentPage = DrawerPage.BOOKSHELF },
                 )
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },
