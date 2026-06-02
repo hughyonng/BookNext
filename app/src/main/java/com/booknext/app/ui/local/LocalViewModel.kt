@@ -22,6 +22,7 @@ data class LocalBook(
     val format: String,
     val size: Long,
     val bookId: String = "",
+    val isFavorite: Boolean = false,
 )
 
 @HiltViewModel
@@ -40,18 +41,23 @@ class LocalViewModel @Inject constructor(
     }
 
     private fun loadLocalBooks() {
-        val books = localDir.listFiles()
-            ?.filter { it.extension in listOf("epub", "pdf", "txt", "mobi", "azw3") }
-            ?.map { file ->
-                LocalBook(
-                    path = file.absolutePath,
-                    name = file.nameWithoutExtension,
-                    format = file.extension,
-                    size = file.length(),
-                    bookId = "local_${file.nameWithoutExtension}",
-                )
-            } ?: emptyList()
-        _localBooks.value = books.sortedByDescending { File(it.path).lastModified() }
+        viewModelScope.launch(Dispatchers.IO) {
+            val books = localDir.listFiles()
+                ?.filter { it.extension in listOf("epub", "pdf", "txt", "mobi", "azw3") }
+                ?.map { file ->
+                    val bookId = "local_${file.nameWithoutExtension}"
+                    val entity = runCatching { bookDao.getById(bookId) }.getOrNull()
+                    LocalBook(
+                        path = file.absolutePath,
+                        name = file.nameWithoutExtension,
+                        format = file.extension,
+                        size = file.length(),
+                        bookId = bookId,
+                        isFavorite = entity?.isFavorite ?: false,
+                    )
+                } ?: emptyList()
+            _localBooks.value = books.sortedByDescending { File(it.path).lastModified() }
+        }
     }
 
     fun importFile(context: Context, uri: Uri) {
@@ -90,11 +96,14 @@ class LocalViewModel @Inject constructor(
         file.delete()
         viewModelScope.launch(Dispatchers.IO) {
             bookDao.deleteById(bookId)
+            loadLocalBooks()
         }
-        loadLocalBooks()
     }
 
     fun toggleFavorite(bookId: String) {
-        viewModelScope.launch { bookDao.toggleFavorite(bookId) }
+        viewModelScope.launch {
+            bookDao.toggleFavorite(bookId)
+            loadLocalBooks()
+        }
     }
 }
