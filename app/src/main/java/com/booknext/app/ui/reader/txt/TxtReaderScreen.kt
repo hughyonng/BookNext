@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,7 +59,7 @@ fun TxtReaderScreen(
                 AnimatedVisibility(visible = uiVisible) {
                     TopAppBar(
                         title = { Text(title, maxLines = 1) },
-                        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") } },
+                        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
                         actions = { IconButton(onClick = onAnnotationsClick) { Icon(Icons.Default.Bookmark, "标注") } },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = bgColor, titleContentColor = textColor),
                     )

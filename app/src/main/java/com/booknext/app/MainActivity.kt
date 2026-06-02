@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import com.booknext.app.data.local.prefs.UserPreferences
 import com.booknext.app.ui.bookshelf.BookshelfScreen
 import com.booknext.app.ui.category.CategoryScreen

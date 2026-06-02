@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -84,7 +86,7 @@ fun CloudScreen(
                         }) { Icon(Icons.Default.Close, "取消选择") }
                         selectedFolder != null -> IconButton(onClick = {
                             selectedFolder = null
-                        }) { Icon(Icons.Default.ArrowBack, "返回") }
+                        }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
                         else -> IconButton(onClick = onMenuClick) {
                             Icon(Icons.Default.Menu, "菜单")
                         }
@@ -101,7 +103,7 @@ fun CloudScreen(
                         }
                         if (selectedBooks.isNotEmpty() && folderNames.isNotEmpty()) {
                             IconButton(onClick = { showFolderSheet = true }) {
-                                Icon(Icons.Default.DriveFileMove, "移动")
+                                Icon(Icons.AutoMirrored.Filled.DriveFileMove, "移动")
                             }
                         }
                         IconButton(onClick = { showDeleteConfirm = true }) {

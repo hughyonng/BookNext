@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -134,12 +137,12 @@ fun BookshelfScreen(
                 navigationIcon = {
                     when {
                         showFavoritesOnly -> IconButton(onClick = onFavoritesFilterCleared) {
-                            Icon(Icons.Default.ArrowBack, "返回全部书籍")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回全部书籍")
                         }
                         isSearching -> IconButton(onClick = {
                             isSearching = false
                             viewModel.onSearch("")
-                        }) { Icon(Icons.Default.ArrowBack, "关闭搜索") }
+                        }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭搜索") }
                         selectedBooks.isNotEmpty() -> IconButton(onClick = {
                             selectedBooks = emptySet()
                         }) { Icon(Icons.Default.Close, "取消选择") }
@@ -185,7 +188,7 @@ fun BookshelfScreen(
                                 when (layoutMode) {
                                     LayoutMode.GRID_3 -> Icons.Default.GridView
                                     LayoutMode.GRID_4 -> Icons.Default.Apps
-                                    LayoutMode.LIST -> Icons.Default.ViewList
+                                    LayoutMode.LIST -> Icons.AutoMirrored.Filled.ViewList
                                 },
                                 "布局",
                             )
@@ -203,7 +206,7 @@ fun BookshelfScreen(
                             DropdownMenuItem(
                                 text = { Text("排序方式") },
                                 onClick = { showMenu = false; showSortSheet = true },
-                                leadingIcon = { Icon(Icons.Default.Sort, null) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) },
                             )
                             DropdownMenuItem(
                                 text = { Text("刷新书库") },
@@ -449,7 +452,7 @@ fun BookshelfScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     listOf(
-                        LayoutMode.LIST to Pair(Icons.Default.ViewList, "列表"),
+                        LayoutMode.LIST to Pair(Icons.AutoMirrored.Filled.ViewList, "列表"),
                         LayoutMode.GRID_3 to Pair(Icons.Default.GridView, "3列"),
                         LayoutMode.GRID_4 to Pair(Icons.Default.Apps, "4列"),
                     ).forEach { (mode, pair) ->

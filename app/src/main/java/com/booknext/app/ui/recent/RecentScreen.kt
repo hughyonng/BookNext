@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -94,7 +96,7 @@ fun RecentScreen(
                         Text("最近阅读", style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = { showDetail = true }) {
                             Text("查看全部")
-                            Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -208,7 +210,7 @@ private fun EntryCard(
                 Text(desc, fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.Default.ArrowForward, null,
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -229,7 +231,7 @@ private fun RecentDetailPage(
                 title = { Text("最近阅读 — 全部") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 }
             )

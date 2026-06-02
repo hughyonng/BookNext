@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,7 +62,7 @@ fun CategoryScreen(
                 navigationIcon = {
                     if (selectedFolder != null) {
                         IconButton(onClick = { selectedFolder = null }) {
-                            Icon(Icons.Default.ArrowBack, "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                         }
                     } else if (selectedFolderForEdit != null) {
                         IconButton(onClick = { selectedFolderForEdit = null }) {
