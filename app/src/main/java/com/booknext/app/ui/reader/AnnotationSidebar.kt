@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatQuote
-import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,7 +83,7 @@ fun AnnotationCard(ann: AnnotationEntity, onDelete: () -> Unit) {
         else -> "标注"
     }
     val typeIcon = when (ann.type) {
-        "note" -> Icons.Default.Note
+        "note" -> Icons.AutoMirrored.Filled.Note
         "quote" -> Icons.Default.FormatQuote
         else -> null
     }

@@ -5,6 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -52,7 +56,7 @@ fun DrawerContent(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Default.MenuBook,
+                            Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(28.dp),
@@ -86,7 +90,7 @@ fun DrawerContent(
 
         val navItems = listOf(
             Triple(DrawerPage.RECENT,    Icons.Default.History,      "最近阅读"),
-            Triple(DrawerPage.BOOKSHELF, Icons.Default.LibraryBooks, "我的书架"),
+            Triple(DrawerPage.BOOKSHELF, Icons.AutoMirrored.Filled.LibraryBooks, "我的书架"),
             Triple(DrawerPage.CATEGORY,  Icons.Default.Folder,       "我的分类"),
             Triple(DrawerPage.LOCAL,     Icons.Default.PhoneAndroid, "本地文件"),
             Triple(DrawerPage.CLOUD,     Icons.Default.Cloud,        "我的云盘"),
@@ -111,7 +115,7 @@ fun DrawerContent(
                 if (isDarkMode) "日间" else "夜间",
                 onClick = onDarkModeToggle,
             )
-            NavIconButton(Icons.Default.ExitToApp, "退出", onClick = onLogout,
+            NavIconButton(Icons.AutoMirrored.Filled.ExitToApp, "退出", onClick = onLogout,
                 tint = MaterialTheme.colorScheme.error)
         }
 
@@ -121,7 +125,7 @@ fun DrawerContent(
                 onClick = onLoginClick,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             ) {
-                Icon(Icons.Default.Login, null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.Login, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("登录")
             }
