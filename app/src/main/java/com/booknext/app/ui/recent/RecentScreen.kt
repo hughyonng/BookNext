@@ -32,7 +32,6 @@ private const val MAX_SUMMARY_BOOKS = 5
 fun RecentScreen(
     onBookClick: (String) -> Unit,
     onMenuClick: () -> Unit,
-    onNavigateToBookmarks: () -> Unit = {},
     onNavigateToNotes: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
     onNavigateToOnlineLibrary: () -> Unit = {},
@@ -161,17 +160,8 @@ fun RecentScreen(
 
             item {
                 EntryCard(
-                    icon = Icons.Default.Bookmark,
-                    title = "书签",
-                    desc = "阅读进度标记，快速跳转",
-                    onClick = onNavigateToBookmarks,
-                )
-            }
-
-            item {
-                EntryCard(
                     icon = Icons.Default.Edit,
-                    title = "摘抄",
+                    title = "摘抄本",
                     desc = "标注、笔记和高亮记录",
                     onClick = onNavigateToNotes,
                 )

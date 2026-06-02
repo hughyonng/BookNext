@@ -202,7 +202,6 @@ fun MainDrawerScaffold(
                 DrawerPage.RECENT -> RecentScreen(
                     onBookClick = { readerBookId = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
-                    onNavigateToBookmarks = { showQuotes = true },
                     onNavigateToNotes = { showQuotes = true },
                     onNavigateToStats = { showStats = true },
                     onNavigateToOnlineLibrary = { currentPage = DrawerPage.ONLINE_LIBRARY },
