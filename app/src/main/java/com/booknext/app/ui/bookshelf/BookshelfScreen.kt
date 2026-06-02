@@ -52,6 +52,8 @@ fun BookshelfScreen(
     onBookClick: (BookEntity) -> Unit,
     onMenuClick: () -> Unit,
     onUploadClick: () -> Unit,
+    showFavoritesOnly: Boolean = false,
+    onFavoritesFilterCleared: () -> Unit = {},
     viewModel: BookshelfViewModel = hiltViewModel(),
 ) {
     val books by viewModel.books.collectAsState()
@@ -82,10 +84,11 @@ fun BookshelfScreen(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? -> uri?.let { localViewModel.importFile(context, it) } }
 
-    val sortedBooks = remember(books, sortOrder) {
-        val filtered = when (sortOrder) {
-            SortOrder.ONLINE_ONLY -> books.filter { it.filePath == null }
-            SortOrder.LOCAL_ONLY -> books.filter { it.filePath != null }
+    val sortedBooks = remember(books, sortOrder, showFavoritesOnly) {
+        val filtered = when {
+            showFavoritesOnly -> books.filter { it.isFavorite }
+            sortOrder == SortOrder.ONLINE_ONLY -> books.filter { it.filePath == null }
+            sortOrder == SortOrder.LOCAL_ONLY -> books.filter { it.filePath != null }
             else -> books
         }
         when (sortOrder) {
@@ -120,6 +123,8 @@ fun BookshelfScreen(
                                 focusedBorderColor = Color.Transparent,
                             ),
                         )
+                    } else if (showFavoritesOnly) {
+                        Text("我的收藏", maxLines = 1)
                     } else if (selectedBooks.isNotEmpty()) {
                         Text("已选 ${selectedBooks.size} 本")
                     } else {
@@ -128,6 +133,9 @@ fun BookshelfScreen(
                 },
                 navigationIcon = {
                     when {
+                        showFavoritesOnly -> IconButton(onClick = onFavoritesFilterCleared) {
+                            Icon(Icons.Default.ArrowBack, "返回全部书籍")
+                        }
                         isSearching -> IconButton(onClick = {
                             isSearching = false
                             viewModel.onSearch("")
@@ -229,9 +237,10 @@ fun BookshelfScreen(
                 syncState is SyncState.Loading && books.isEmpty() -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-                books.isEmpty() -> {
+                sortedBooks.isEmpty() -> {
                     Text(
-                        if (searchQuery.isNotEmpty()) "未找到匹配的书籍"
+                        if (showFavoritesOnly) "还没有收藏的书籍"
+                        else if (searchQuery.isNotEmpty()) "未找到匹配的书籍"
                         else "书库为空，请先上传书籍",
                         modifier = Modifier.align(Alignment.Center),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

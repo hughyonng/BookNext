@@ -123,13 +123,15 @@ fun MainDrawerScaffold(
     var showSettings by remember { mutableStateOf(false) }
     var showQuotes by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
+    var showFavoritesOnly by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || drawerState.isOpen) {
+    BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || showFavoritesOnly || drawerState.isOpen) {
         when {
             readerBookId != null -> readerBookId = null
             showQuotes -> showQuotes = false
             showStats -> showStats = false
             showSettings -> showSettings = false
+            showFavoritesOnly -> showFavoritesOnly = false
             drawerState.isOpen -> scope.launch { drawerState.close() }
         }
     }
@@ -206,12 +208,17 @@ fun MainDrawerScaffold(
                     onNavigateToNotes = { showQuotes = true },
                     onNavigateToStats = { showStats = true },
                     onNavigateToOnlineLibrary = { currentPage = DrawerPage.ONLINE_LIBRARY },
-                    onNavigateToFavorites = { currentPage = DrawerPage.BOOKSHELF },
+                    onNavigateToFavorites = {
+                        currentPage = DrawerPage.BOOKSHELF
+                        showFavoritesOnly = true
+                    },
                 )
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onUploadClick = { currentPage = DrawerPage.CLOUD },
+                    showFavoritesOnly = showFavoritesOnly,
+                    onFavoritesFilterCleared = { showFavoritesOnly = false },
                 )
                 DrawerPage.CATEGORY -> CategoryScreen(
                     onBookClick = { readerBookId = it },
