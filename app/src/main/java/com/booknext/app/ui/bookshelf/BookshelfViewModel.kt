@@ -9,6 +9,7 @@ import com.booknext.app.data.remote.ApiClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -127,9 +128,7 @@ class BookshelfViewModel @Inject constructor(
             booksInFolder.forEach { book ->
                 bookDao.updateCategory(book.bookId, "")
                 try {
-                    val body = okhttp3.RequestBody.create(
-                        "text/plain".toMediaType(), ""
-                    )
+                    val body = "".toRequestBody("text/plain".toMediaType())
                     apiClient.api().updateBook(id = book.bookId, category = body)
                 } catch (_: Exception) {}
             }
@@ -141,9 +140,7 @@ class BookshelfViewModel @Inject constructor(
         viewModelScope.launch {
             bookDao.updateCategory(bookId, folderName)
             try {
-                val body = okhttp3.RequestBody.create(
-                    "text/plain".toMediaType(), folderName
-                )
+                val body = folderName.toRequestBody("text/plain".toMediaType())
                 apiClient.api().updateBook(id = bookId, category = body)
             } catch (_: Exception) {}
         }

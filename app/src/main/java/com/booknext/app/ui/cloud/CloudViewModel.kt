@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import javax.inject.Inject
 
@@ -142,7 +142,7 @@ class CloudViewModel @Inject constructor(
     fun moveBook(bookId: String, folderName: String) {
         viewModelScope.launch {
             try {
-                val body = RequestBody.create("text/plain".toMediaType(), folderName)
+                val body = folderName.toRequestBody("text/plain".toMediaType())
                 apiClient.api().updateBook(id = bookId, category = body)
                 bookDao.updateCategory(bookId, folderName)
             } catch (_: Exception) {}
