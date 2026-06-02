@@ -8,6 +8,7 @@ import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.remote.ApiClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
@@ -46,58 +47,68 @@ class CloudViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             _state.value = CloudUiState.Loading
-            try {
-                val allBooks = mutableListOf<com.booknext.app.data.remote.dto.BookDto>()
-                var page = 1
-                while (true) {
-                    val resp = apiClient.api().listBooks(page = page, pageSize = 100)
-                    allBooks.addAll(resp.books)
-                    if (allBooks.size >= resp.total) break
-                    page++
-                }
-
-                val entities = allBooks.map { dto ->
-                    BookEntity(
-                        bookId = dto.bookId,
-                        title = dto.title,
-                        author = dto.author,
-                        format = dto.format,
-                        fileSize = dto.size,
-                        uploadTime = 0L,
-                        hasCover = dto.hasCover,
-                        status = dto.status,
-                        category = dto.category,
-                        pageCount = dto.pageCount,
-                    )
-                }
-                bookDao.upsertAll(entities)
-
-                val grouped = entities
-                    .filter { it.category != "__ocr__" }
-                    .groupBy { it.category.ifEmpty { "__root__" } }
-
-                val folders = mutableListOf<CloudFolder>()
-
-                grouped["__root__"]?.let { books ->
-                    folders.add(CloudFolder("__root__", "未分类书籍", books))
-                }
-
-                grouped.entries
-                    .filter { it.key != "__root__" }
-                    .sortedBy { it.key }
-                    .forEach { (name, books) ->
-                        folders.add(CloudFolder(name, name, books))
+            var attempt = 0
+            val maxAttempts = 3
+            while (attempt < maxAttempts) {
+                attempt++
+                try {
+                    val allBooks = mutableListOf<com.booknext.app.data.remote.dto.BookDto>()
+                    var page = 1
+                    while (true) {
+                        val resp = apiClient.api().listBooks(page = page, pageSize = 100)
+                        allBooks.addAll(resp.books)
+                        if (allBooks.size >= resp.total) break
+                        page++
                     }
 
-                val totalBytes = entities.sumOf { it.fileSize }
+                    val entities = allBooks.map { dto ->
+                        BookEntity(
+                            bookId = dto.bookId,
+                            title = dto.title,
+                            author = dto.author,
+                            format = dto.format,
+                            fileSize = dto.size,
+                            uploadTime = 0L,
+                            hasCover = dto.hasCover,
+                            status = dto.status,
+                            category = dto.category,
+                            pageCount = dto.pageCount,
+                        )
+                    }
+                    bookDao.upsertAll(entities)
 
-                _state.value = CloudUiState.Ready(
-                    folders = folders,
-                    totalBytes = totalBytes,
-                    bookCount = entities.size,
-                )
-            } catch (e: Exception) {
-                _state.value = CloudUiState.Error("加载失败：${e.message}")
+                    val grouped = entities
+                        .filter { it.category != "__ocr__" }
+                        .groupBy { it.category.ifEmpty { "__root__" } }
+
+                    val folders = mutableListOf<CloudFolder>()
+
+                    grouped["__root__"]?.let { books ->
+                        folders.add(CloudFolder("__root__", "未分类书籍", books))
+                    }
+
+                    grouped.entries
+                        .filter { it.key != "__root__" }
+                        .sortedBy { it.key }
+                        .forEach { (name, books) ->
+                            folders.add(CloudFolder(name, name, books))
+                        }
+
+                    val totalBytes = entities.sumOf { it.fileSize }
+
+                    _state.value = CloudUiState.Ready(
+                        folders = folders,
+                        totalBytes = totalBytes,
+                        bookCount = entities.size,
+                    )
+                    return@launch
+                } catch (e: Exception) {
+                    if (attempt >= maxAttempts) {
+                        _state.value = CloudUiState.Error("加载失败：${e.message}")
+                    } else {
+                        delay(1000L * attempt)
+                    }
+                }
             }
         }
     }
@@ -127,6 +138,11 @@ class CloudViewModel @Inject constructor(
                     if (destFile.exists()) return@forEach
                     val request = okhttp3.Request.Builder().url(url).build()
                     val response = client.newCall(request).execute()
+                    if (!response.isSuccessful) {
+                        response.close()
+                        _state.value = CloudUiState.Error("下载失败：${book.title} — HTTP ${response.code}")
+                        return@forEach
+                    }
                     response.body?.byteStream()?.use { input ->
                         destFile.outputStream().use { output -> input.copyTo(output) }
                     }
