@@ -32,6 +32,7 @@ import com.booknext.app.ui.reader.ReaderToolbarState
 import com.booknext.app.ui.reader.TocEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -49,7 +50,6 @@ private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
 private var epubSearchIndex: List<Pair<Int, String>>? = null
 private var epubPendingHighlight: String = ""
-private var epubHighlightRetries: Int = 0
 
 private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
@@ -253,7 +253,6 @@ fun EpubReaderScreen(
                             epubSearchQuery = ""
                             epubSearchMatches = emptyList()
                             epubPendingHighlight = ""
-                            epubHighlightRetries = 0
                         }) { Text("清除", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
                         IconButton(onClick = { showEpubSearchResults = false; showEpubBackToResults = true }) { Icon(Icons.Default.Close, "关闭", tint = srFg) }
                     }
@@ -576,6 +575,29 @@ private suspend fun openEpubPublication(
                     it.href.toString() == locator.href.toString()
                 }.coerceAtLeast(0)
                 onProgressChange(chapterIndex)
+                // 搜索高亮+滚动（每次章节切换后执行）
+                val hq = epubPendingHighlight
+                if (hq.isNotEmpty()) {
+                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
+                        // 延迟200ms等WebView渲染完成后执行
+                        kotlinx.coroutines.delay(200)
+                        fun findWebView(v: android.view.View): WebView? {
+                            if (v is WebView) return v
+                            if (v is android.view.ViewGroup) {
+                                for (i in 0 until v.childCount) {
+                                    findWebView(v.getChildAt(i))?.let { return it }
+                                }
+                            }
+                            return null
+                        }
+                        val wv = findWebView(container) ?: return@launch
+                        val q = hq.replace("'", "\\'")
+                        wv.evaluateJavascript(
+                            "(function(){var q='" + q + "';if(!q)return;var walk=document.createTreeWalker(document.body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}var firstMatch=null;for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(after,n);p.insertBefore(mark,n);p.insertBefore(before,n);p.removeChild(n);firstMatch=mark;}if(firstMatch)firstMatch.scrollIntoView({behavior:'auto',block:'center'});})();",
+                            null,
+                        )
+                    }
+                }
                 // Extract text for TTS
                 kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
                     val link = publication.readingOrder.getOrNull(chapterIndex) ?: run {
@@ -645,27 +667,8 @@ private suspend fun openEpubPublication(
             // 轮询检测选择
             val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
             var lastSel = ""
-            var lastHighlighted = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
-                    // 搜索高亮注入（连续注射5轮确保新页面加载后命中）
-                    val pending = epubPendingHighlight
-                    if (pending.isNotEmpty()) {
-                        if (pending != lastHighlighted) {
-                            lastHighlighted = pending
-                            epubHighlightRetries = 5
-                        }
-                        if (epubHighlightRetries > 0) {
-                            epubHighlightRetries--
-                            val q = pending.replace("'", "\\'")
-                            wv.evaluateJavascript(
-                                "(function(){var q='" + q + "';if(!q)return;var walk=document.createTreeWalker(document.body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(after,n);p.insertBefore(mark,n);p.insertBefore(before,n);p.removeChild(n);}})();",
-                                null,
-                            )
-                        }
-                    } else {
-                        lastHighlighted = ""
-                    }
                     // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
                         val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
