@@ -274,7 +274,7 @@ fun EpubReaderWrapper(
     }
 
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding().navigationBarsPadding(),
         factory = { ctx ->
             val container = object : FrameLayout(ctx) {
                 var downY = 0f

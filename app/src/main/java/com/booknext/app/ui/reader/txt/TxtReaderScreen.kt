@@ -191,6 +191,7 @@ fun TxtReaderScreen(
                     .fillMaxSize()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(bottom = 80.dp), // 底部留空，避免虚拟按键遮挡
             ) {
                 items(displayLines.size) { i ->
                     AndroidView(
