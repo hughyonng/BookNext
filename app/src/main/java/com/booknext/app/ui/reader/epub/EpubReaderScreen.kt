@@ -3,6 +3,7 @@ package com.booknext.app.ui.reader.epub
 import android.os.Bundle
 import android.webkit.WebView
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
@@ -87,6 +89,7 @@ fun EpubReaderScreen(
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val epubCtx = androidx.compose.ui.platform.LocalContext.current
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -161,7 +164,12 @@ fun EpubReaderScreen(
                 }
             },
             onAddBookmark = { onAddBookmark(initialPage) },
-            onSearch = { _, _ -> },
+            onSearch = { _, _ ->
+                Toast.makeText(epubCtx, "EPUB暂不支持搜索功能", Toast.LENGTH_SHORT).show()
+            },
+            onReplaceAll = { _, _ ->
+                Toast.makeText(epubCtx, "EPUB暂不支持替换功能", Toast.LENGTH_SHORT).show()
+            },
             book = book,
             sessions = sessions,
             coverUrl = coverUrl,
