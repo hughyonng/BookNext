@@ -108,7 +108,6 @@ fun ReaderToolbarOverlay(
     var showOtherOptions by remember { mutableStateOf(false) }
     var showNameReplace by remember { mutableStateOf(false) }
     var showShare by remember { mutableStateOf(false) }
-    var showReadingSettings by remember { mutableStateOf(false) }
     var showTranslateSettings by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -163,7 +162,6 @@ fun ReaderToolbarOverlay(
                                 "书签" to "Bookmarks",
                                 "搜索" to "Search",
                                 "词典" to "Dictionary",
-                                "阅读设置" to "ReadingSettings",
                                 "翻译设置" to "TranslateSettings",
                             ).forEach { (label, action) ->
                                 DropdownMenuItem(
@@ -176,7 +174,6 @@ fun ReaderToolbarOverlay(
                                             "Bookmarks" -> showBookmarks = true
                                             "Search" -> showSearchBar = true
                                             "Dictionary" -> onDictionaryLookup()
-                                            "ReadingSettings" -> showReadingSettings = true
                                             "TranslateSettings" -> showTranslateSettings = true
                                         }
                                     }
@@ -341,18 +338,6 @@ fun ReaderToolbarOverlay(
                     options = currentVisualOptions,
                     onOptionsChange = { onSaveVisualOptions(it); showVisualOptions = false },
                     onDismiss = { showVisualOptions = false },
-                )
-            }
-        }
-
-        if (showReadingSettings) {
-            Dialog(
-                onDismissRequest = { showReadingSettings = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                ReadingSettingsPanel(
-                    onDismiss = { showReadingSettings = false },
-                    onSaveSetting = onSaveSetting,
                 )
             }
         }
@@ -712,75 +697,6 @@ private fun FindReplaceDialog(
                 ) { Text("替换全部") }
             }
         }
-    }
-}
-
-@Composable
-private fun ReadingSettingsPanel(
-    onDismiss: () -> Unit,
-    onSaveSetting: (String, Any) -> Unit,
-) {
-    var landscape by remember { mutableStateOf(false) }
-    var keepScreenOn by remember { mutableStateOf(true) }
-    var showStatusBar by remember { mutableStateOf(false) }
-    var showNavBar by remember { mutableStateOf(false) }
-    var volumeFlip by remember { mutableStateOf(true) }
-
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text("阅读设置", style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp))
-
-            ReadingSettingToggle("横屏阅读", landscape) {
-                landscape = it
-                onSaveSetting("screenOrientation", if (it) "landscape" else "auto")
-            }
-            ReadingSettingToggle("显示顶部系统状态栏", showStatusBar) {
-                showStatusBar = it
-                onSaveSetting("showStatusBar", it)
-            }
-            ReadingSettingToggle("显示底部系统导航栏", showNavBar) {
-                showNavBar = it
-                onSaveSetting("showNavBar", it)
-            }
-            ReadingSettingToggle("音量键翻页", volumeFlip) {
-                volumeFlip = it
-                onSaveSetting("volumeFlip", it)
-            }
-            ReadingSettingToggle("阅读时保持屏幕常亮", keepScreenOn) {
-                keepScreenOn = it
-                onSaveSetting("keepScreenOn", it)
-            }
-
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                Text("关闭")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReadingSettingToggle(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
