@@ -7,11 +7,16 @@ import android.widget.Toast
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +46,22 @@ import java.io.File
 
 private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
+private var epubSearchIndex: List<Pair<Int, String>>? = null
+
+private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
+    val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
+    if (query.isBlank()) return builder.toAnnotatedString()
+    var start = 0
+    val lower = text.lowercase()
+    val qLower = query.lowercase()
+    while (true) {
+        val idx = lower.indexOf(qLower, start)
+        if (idx < 0) break
+        builder.addStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color.Red), idx, idx + qLower.length)
+        start = idx + qLower.length
+    }
+    return builder.toAnnotatedString()
+}
 
 @Composable
 fun EpubReaderScreen(
@@ -90,6 +111,10 @@ fun EpubReaderScreen(
     var floatingText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val epubCtx = androidx.compose.ui.platform.LocalContext.current
+    // 搜索状态
+    var epubSearchQuery by remember { mutableStateOf("") }
+    var epubSearchMatches by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
+    var showEpubSearchResults by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -164,8 +189,19 @@ fun EpubReaderScreen(
                 }
             },
             onAddBookmark = { onAddBookmark(initialPage) },
-            onSearch = { _, _ ->
-                Toast.makeText(epubCtx, "EPUB暂不支持搜索功能", Toast.LENGTH_SHORT).show()
+            onSearch = { query, _ ->
+                if (query.isNotBlank()) {
+                    epubSearchQuery = query
+                    val index = epubSearchIndex
+                    if (index != null) {
+                        epubSearchMatches = index.mapNotNull { (chIdx, text) ->
+                            if (text.contains(query, ignoreCase = true)) chIdx to text.take(200) else null
+                        }
+                    } else {
+                        epubSearchMatches = emptyList()
+                    }
+                    showEpubSearchResults = true
+                }
             },
             onReplaceAll = { _, _ ->
                 Toast.makeText(epubCtx, "EPUB暂不支持替换功能", Toast.LENGTH_SHORT).show()
@@ -186,6 +222,55 @@ fun EpubReaderScreen(
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
         )
+        // 搜索结果覆盖层
+        if (showEpubSearchResults) {
+            val bg = Color(0xFF1A1814)
+            val fg = Color(0xFFE0D8CC)
+            Surface(
+                color = bg,
+                modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("搜索: $epubSearchQuery", color = fg, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        Text("共 ${epubSearchMatches.size} 个结果", color = fg.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
+                        IconButton(onClick = { showEpubSearchResults = false }) { Icon(Icons.Default.Close, "关闭", tint = fg) }
+                    }
+                    HorizontalDivider(color = fg.copy(alpha = 0.2f))
+                    if (epubSearchMatches.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("正在索引中，请稍后重试…", color = fg.copy(alpha = 0.6f))
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                            items(epubSearchMatches.size) { idx ->
+                                val (chIdx, text) = epubSearchMatches[idx]
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        showEpubSearchResults = false
+                                        val nav = epubNavigatorRef
+                                        val pubRef = epubPublicationRef
+                                        if (nav != null && pubRef != null) {
+                                            val link = pubRef.readingOrder.getOrNull(chIdx) ?: return@launch
+                                            val hrefStr = link.href.toString()
+                                            val url = org.readium.r2.shared.util.Url(hrefStr) ?: return@launch
+                                            nav.go(Locator(href = url, mediaType = link.mediaType ?: MediaType.EPUB), animated = false)
+                                        }
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Text("第 ${chIdx + 1} 章", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                        val display = text.take(150).trim()
+                                        Text(buildEpubSpannable(display, epubSearchQuery), style = MaterialTheme.typography.bodyMedium, color = fg, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    }
+                                }
+                                if (idx < epubSearchMatches.size - 1) HorizontalDivider(color = fg.copy(alpha = 0.1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // 浮动菜单（可拖拽）
         if (showFloatingMenu) {
             var offsetX by remember { mutableFloatStateOf(40f) }
@@ -482,6 +567,24 @@ private suspend fun openEpubPublication(
         activity.supportFragmentManager.executePendingTransactions()
         epubNavigatorRef = activity.supportFragmentManager
             .findFragmentById(container.id) as? EpubNavigatorFragment
+        // 后台构建搜索索引
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            val index = mutableListOf<Pair<Int, String>>()
+            for (chIdx in publication.readingOrder.indices) {
+                val link = publication.readingOrder.getOrNull(chIdx) ?: continue
+                try {
+                    val resource = publication.get(link)
+                    val bytes = resource?.read()?.getOrNull() ?: continue
+                    val html = bytes.toString(Charsets.UTF_8)
+                    val text = html.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
+                    if (text.length > 30) {
+                        index.add(chIdx to text)
+                    }
+                } catch (_: Exception) {}
+            }
+            epubSearchIndex = index
+            android.util.Log.d("BookNext", "Search index built: ${index.size} chapters")
+        }
         // 找 WebView 注入文字选择检测
         container.postDelayed({
             fun findWebView(v: android.view.View): WebView? {
