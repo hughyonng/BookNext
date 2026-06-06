@@ -84,13 +84,15 @@ fun EpubReaderScreen(
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    var jumpCount by remember { mutableIntStateOf(0) }
+    var jumpTarget by remember { mutableIntStateOf(initialPage) }
     Box(Modifier.fillMaxSize()) {
-        key(darkMode, fontSize) {
+        key(darkMode, fontSize, jumpCount) {
         EpubReaderWrapper(
             file = file,
             fontSize = fontSize,
             darkMode = darkMode,
-            initialPage = initialPage,
+            initialPage = jumpTarget,
             onProgressChange = onProgressChange,
             onToggleUI = { uiVisible = !uiVisible },
     onTocEntries = { tocEntries = it },
@@ -141,7 +143,7 @@ fun EpubReaderScreen(
                 }
             },
             onTtsStop = { epubTtsPlaying = false; stopTts() },
-            onTocJump = onProgressChange,
+            onTocJump = { idx -> jumpTarget = idx; jumpCount++ },
             onAddBookmark = { onAddBookmark(initialPage) },
             onSearch = { _, _ -> },
             book = book,
