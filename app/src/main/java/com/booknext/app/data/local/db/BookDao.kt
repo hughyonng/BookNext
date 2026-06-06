@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BookDao {
-    @Query("SELECT * FROM books ORDER BY lastReadTime DESC")
+    @Query("SELECT * FROM books ORDER BY lastReadAt DESC")
     fun observeAll(): Flow<List<BookEntity>>
 
     @Query("SELECT * FROM books WHERE bookId = :id")
@@ -35,11 +35,11 @@ interface BookDao {
     @Query("DELETE FROM books WHERE bookId = :id")
     suspend fun deleteById(id: String)
 
-    @Query("UPDATE books SET progress = :progress, readingPercent = :percent, lastReadTime = :time, pendingSync = 1 WHERE bookId = :id")
+    @Query("UPDATE books SET progress = :progress, readingPercent = :percent, lastReadAt = :time, pendingSync = 1 WHERE bookId = :id")
     suspend fun updateProgress(id: String, progress: String, percent: Float, time: Long)
 
-    @Query("UPDATE books SET progress = :progress WHERE bookId = :bookId")
-    suspend fun updateProgressNumeric(bookId: String, progress: String)
+    @Query("UPDATE books SET progress = :progress, pendingSync = 1, lastReadAt = :time WHERE bookId = :bookId")
+    suspend fun updateProgressNumeric(bookId: String, progress: String, time: Long)
 
     @Query("UPDATE books SET pendingSync = 0 WHERE bookId = :id")
     suspend fun markSynced(id: String)

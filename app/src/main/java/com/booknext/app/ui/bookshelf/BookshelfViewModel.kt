@@ -38,7 +38,7 @@ class BookshelfViewModel @Inject constructor(
 
     // 文件夹列表（合并书籍分类 + DataStore 空文件夹）
     val folders: StateFlow<List<String>> = combine(
-        bookDao.observeAll(),
+        books,
         prefs.emptyFolders,
     ) { books, emptyFolders ->
         val fromBooks = books
@@ -50,7 +50,7 @@ class BookshelfViewModel @Inject constructor(
 
     // 筛选 + 搜索后的书单
     val filteredBooks: StateFlow<List<BookEntity>> = combine(
-        bookDao.observeAll(), _selectedFolder, _searchQuery
+        books, _selectedFolder, _searchQuery
     ) { books, folder, query ->
         books.filter { book ->
             val matchFolder = folder == null || book.category == folder
@@ -71,13 +71,25 @@ class BookshelfViewModel @Inject constructor(
 
     fun syncBooks() {
         viewModelScope.launch {
+            val url = prefs.serverUrl.first()
+            if (url.isEmpty()) return@launch
             _syncState.value = SyncState.Loading
             try {
-                val resp = apiClient.api().listBooks(page = 1, pageSize = 100)
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                val entities = resp.books.map { dto ->
+                var page = 1
+                val allRemoteBooks = mutableListOf<com.booknext.app.data.remote.dto.BookDto>()
+                while (true) {
+                    val resp = apiClient.api().listBooks(page = page, pageSize = 100)
+                    allRemoteBooks.addAll(resp.books)
+                    if (resp.books.size < 100) break
+                    page++
+                }
+                val fmtT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                val fmtS = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                val entities = allRemoteBooks.map { dto ->
                     val uploadTs = try {
-                        dateFormat.parse(dto.uploadTime.take(19))?.time ?: 0L
+                        val raw = dto.uploadTime.take(19)
+                        val t = fmtT.parse(raw)?.time
+                        if (t != null) t else fmtS.parse(raw.replace("T", " "))?.time ?: 0L
                     } catch (_: Exception) { 0L }
                     BookEntity(
                         bookId = dto.bookId,
@@ -92,8 +104,9 @@ class BookshelfViewModel @Inject constructor(
                         pageCount = dto.pageCount,
                     )
                 }
+                val localMap = bookDao.observeAll().first().associateBy { it.bookId }
                 entities.forEach { entity ->
-                    val old = bookDao.getById(entity.bookId)
+                    val old = localMap[entity.bookId]
                     if (old != null) {
                         bookDao.upsert(entity.copy(
                             lastReadAt = old.lastReadAt,
@@ -103,11 +116,21 @@ class BookshelfViewModel @Inject constructor(
                             totalReadingSeconds = old.totalReadingSeconds,
                             isFinished = old.isFinished,
                             isFavorite = old.isFavorite,
+                            filePath = old.filePath,
+                            isDownloaded = old.isDownloaded,
+                            pendingSync = old.pendingSync,
+                            readingSessionStart = old.readingSessionStart,
+                            lastSyncTime = old.lastSyncTime,
+                            category = old.category,
                         ))
                     } else {
                         bookDao.upsert(entity)
                     }
                 }
+                val remoteIds = allRemoteBooks.map { it.bookId }.toSet()
+                val localAll = bookDao.observeAll().first()
+                localAll.filter { it.bookId !in remoteIds && !it.bookId.startsWith("local_") }
+                    .forEach { bookDao.deleteById(it.bookId) }
                 _syncState.value = SyncState.Success
             } catch (e: Exception) {
                 _syncState.value = SyncState.Error(e.message ?: "同步失败")

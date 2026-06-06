@@ -27,7 +27,6 @@ import com.booknext.app.ui.recent.RecentScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 enum class AppState { WELCOME, LOGIN, MAIN }
@@ -45,25 +44,23 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val isLoggedIn = runBlocking {
-            prefs.serverUrl.first().isNotEmpty() && prefs.apiKey.first().isNotEmpty()
-        }
-        val hasSeenWelcome = runBlocking { prefs.hasSeenWelcome.first() }
-
         setContent {
             val themeId by prefs.themeId.collectAsState(initial = "blue")
             val darkMode by prefs.darkMode.collectAsState(initial = false)
             val serverUrl by prefs.serverUrl.collectAsState(initial = "")
             val scope = rememberCoroutineScope()
 
-            var appState by remember {
-                mutableStateOf(
-                    when {
-                        isLoggedIn -> AppState.MAIN
-                        hasSeenWelcome -> AppState.MAIN
-                        else -> AppState.WELCOME
-                    }
-                )
+            var appState by remember { mutableStateOf(AppState.WELCOME) }
+            var isLoggedIn by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                isLoggedIn = prefs.serverUrl.first().isNotEmpty() &&
+                             prefs.apiKey.first().isNotEmpty()
+                val hasSeenWelcome = prefs.hasSeenWelcome.first()
+                appState = when {
+                    isLoggedIn -> AppState.MAIN
+                    hasSeenWelcome -> AppState.LOGIN
+                    else -> AppState.WELCOME
+                }
             }
 
             BookNextTheme(themeId = themeId, darkTheme = darkMode) {
@@ -123,12 +120,14 @@ fun MainDrawerScaffold(
     var showQuotes by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
     var showFavoritesOnly by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || showFavoritesOnly || drawerState.isOpen) {
+    BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || showFavoritesOnly || showBookmarks || drawerState.isOpen) {
         when {
             readerBookId != null -> readerBookId = null
             showQuotes -> showQuotes = false
             showStats -> showStats = false
+            showBookmarks -> showBookmarks = false
             showSettings -> showSettings = false
             showFavoritesOnly -> showFavoritesOnly = false
             drawerState.isOpen -> scope.launch { drawerState.close() }
@@ -145,6 +144,14 @@ fun MainDrawerScaffold(
     if (showStats) {
         com.booknext.app.ui.stats.StatsScreen(
             onBack = { showStats = false },
+        )
+        return
+    }
+
+    if (showBookmarks) {
+        com.booknext.app.ui.bookmarks.BookmarksScreen(
+            onBack = { showBookmarks = false },
+            onBookClick = { readerBookId = it },
         )
         return
     }
@@ -205,11 +212,11 @@ fun MainDrawerScaffold(
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onNavigateToNotes = { showQuotes = true },
                     onNavigateToStats = { showStats = true },
-                    onNavigateToOnlineLibrary = { currentPage = DrawerPage.ONLINE_LIBRARY },
                     onNavigateToFavorites = {
                         currentPage = DrawerPage.BOOKSHELF
                         showFavoritesOnly = true
                     },
+                    onNavigateToBookmarks = { showBookmarks = true },
                 )
                 DrawerPage.BOOKSHELF -> BookshelfScreen(
                     onBookClick = { readerBookId = it.bookId },

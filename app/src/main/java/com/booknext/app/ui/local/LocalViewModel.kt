@@ -68,7 +68,14 @@ class LocalViewModel @Inject constructor(
                 cursor.getString(idx)
             } ?: "imported_book"
 
-            val destFile = File(localDir, name)
+            var destFile = File(localDir, name)
+            var counter = 1
+            while (destFile.exists()) {
+                val base = name.substringBeforeLast('.')
+                val ext = name.substringAfterLast('.')
+                destFile = File(localDir, "${base}(${counter}).${ext}")
+                counter++
+            }
             context.contentResolver.openInputStream(uri)?.use { input ->
                 destFile.outputStream().use { output -> input.copyTo(output) }
             }

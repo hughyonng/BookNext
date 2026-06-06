@@ -30,6 +30,16 @@ android {
         }
     }
 
+    applicationVariants.configureEach {
+        val vName = mergedFlavor.versionName
+        outputs.configureEach {
+            val apk = (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+            if (apk != null) {
+                apk.outputFileName = "BookNext-v${vName}-${name}.apk"
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -48,6 +58,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE*"
+            excludes += "/META-INF/NOTICE*"
         }
     }
 }
@@ -99,6 +112,15 @@ dependencies {
     implementation("org.readium.kotlin-toolkit:readium-shared:3.1.2")
     implementation("org.readium.kotlin-toolkit:readium-streamer:3.1.2")
     implementation("org.readium.kotlin-toolkit:readium-navigator:3.1.2")
+
+    // Apache POI — Word (.docx/.doc) 解析
+    implementation("org.apache.poi:poi-ooxml:5.2.5") {
+        exclude(group = "org.apache.xmlbeans", module = "xmlbeans")
+    }
+    implementation("org.apache.xmlbeans:xmlbeans:5.2.0")
+    // Markwon — Markdown 渲染
+    implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:html:4.6.2")
 
     // DataStore
     implementation(libs.datastore.preferences)

@@ -57,7 +57,7 @@ class SettingsViewModel @Inject constructor(
 
     fun refreshCacheSize() {
         viewModelScope.launch(Dispatchers.IO) {
-            val cacheDir = File(context.cacheDir, "books")
+            val cacheDir = File(context.filesDir, "books")
             val size = if (cacheDir.exists()) {
                 cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
             } else 0L
@@ -72,7 +72,7 @@ class SettingsViewModel @Inject constructor(
 
     fun clearCache() {
         viewModelScope.launch(Dispatchers.IO) {
-            val cacheDir = File(context.cacheDir, "books")
+            val cacheDir = File(context.filesDir, "books")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach { it.deleteRecursively() }
             }

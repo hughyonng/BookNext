@@ -22,8 +22,7 @@ import coil.compose.AsyncImage
 import com.booknext.app.ui.bookshelf.BookshelfViewModel
 import com.booknext.app.ui.bookshelf.PrefsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,8 +35,8 @@ fun RecentScreen(
     onMenuClick: () -> Unit,
     onNavigateToNotes: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
-    onNavigateToOnlineLibrary: () -> Unit = {},
     onNavigateToFavorites: () -> Unit = {},
+    onNavigateToBookmarks: () -> Unit = {},
     viewModel: BookshelfViewModel = hiltViewModel(),
 ) {
     val recentBooks by viewModel.recentBooks.collectAsState()
@@ -49,8 +48,9 @@ fun RecentScreen(
             context.applicationContext, PrefsEntryPoint::class.java
         )
     }
-    val baseUrl = remember { runBlocking { entryPoint.prefs().serverUrl.first().trimEnd('/') } }
-    val apiKey = remember { runBlocking { entryPoint.prefs().apiKey.first() } }
+    val rawBaseUrl by entryPoint.prefs().serverUrl.collectAsState(initial = "")
+    val apiKey by entryPoint.prefs().apiKey.collectAsState(initial = "")
+    val baseUrl = rawBaseUrl.trimEnd('/')
 
     if (showDetail) {
         RecentDetailPage(
@@ -153,10 +153,10 @@ fun RecentScreen(
 
             item {
                 EntryCard(
-                    icon = Icons.Default.Language,
-                    title = "网上书库",
-                    desc = "免费电子书资源，一键访问",
-                    onClick = onNavigateToOnlineLibrary,
+                    icon = Icons.Default.Bookmark,
+                    title = "我的书签",
+                    desc = "阅读时标记的位置，快速跳转",
+                    onClick = onNavigateToBookmarks,
                 )
             }
 

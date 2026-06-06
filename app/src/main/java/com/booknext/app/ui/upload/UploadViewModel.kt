@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import javax.inject.Inject
@@ -58,8 +59,9 @@ class UploadViewModel @Inject constructor(
         val uri = _state.value.fileUri ?: return
         viewModelScope.launch {
             _state.value = _state.value.copy(uploading = true, error = "", success = false)
+            val ext = _state.value.fileName.substringAfterLast('.', "bin")
+            val tmpFile = File(context.cacheDir, "${java.util.UUID.randomUUID()}.$ext")
             try {
-                val tmpFile = File(context.cacheDir, _state.value.fileName)
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     tmpFile.outputStream().use { output -> input.copyTo(output) }
                 }
@@ -67,15 +69,13 @@ class UploadViewModel @Inject constructor(
                 val filePart = MultipartBody.Part.createFormData(
                     "file",
                     tmpFile.name,
-                    tmpFile.readBytes().toRequestBody("application/octet-stream".toMediaType()),
+                    tmpFile.asRequestBody("application/octet-stream".toMediaType()),
                 )
                 val titleBody = _state.value.title.toRequestBody("text/plain".toMediaType())
                 val authorBody = (_state.value.author.ifEmpty { "未知" }).toRequestBody("text/plain".toMediaType())
                 val ocrBody = "false".toRequestBody("text/plain".toMediaType())
 
                 apiClient.api().uploadBook(filePart, titleBody, authorBody, ocrBody)
-                tmpFile.delete()
-
                 _state.value = _state.value.copy(uploading = false, success = true)
                 delay(1500)
                 onSuccess()
@@ -84,6 +84,8 @@ class UploadViewModel @Inject constructor(
                     uploading = false,
                     error = "上传失败：${e.message}",
                 )
+            } finally {
+                tmpFile.delete()
             }
         }
     }

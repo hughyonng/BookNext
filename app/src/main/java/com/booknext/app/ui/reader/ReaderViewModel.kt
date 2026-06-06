@@ -1,26 +1,38 @@
 package com.booknext.app.ui.reader
 
 import android.content.Context
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.booknext.app.data.local.db.BookDao
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.local.db.AnnotationDao
 import com.booknext.app.data.local.db.AnnotationEntity
+import com.booknext.app.data.local.db.ReadingSessionDao
+import com.booknext.app.data.local.db.ReadingSessionEntity
 import com.booknext.app.data.local.prefs.UserPreferences
 import com.booknext.app.data.remote.ApiClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import com.booknext.app.ui.reader.options.VisualOptions
+import com.booknext.app.ui.reader.options.ControlOptions
+import com.booknext.app.ui.reader.options.OtherOptions
 import kotlinx.coroutines.launch
 import okhttp3.ResponseBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import org.apache.poi.xwpf.usermodel.XWPFDocument
 import java.io.File
+import java.util.Locale
 import javax.inject.Inject
 
 sealed class ReaderState {
@@ -35,6 +47,7 @@ class ReaderViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val bookDao: BookDao,
     private val annotationDao: AnnotationDao,
+    private val sessionDao: ReadingSessionDao,
     private val prefs: UserPreferences,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -56,18 +69,215 @@ class ReaderViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "serif")
     val lineSpacing: StateFlow<Float> = prefs.lineSpacing
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.8f)
+    val screenOrientation: StateFlow<String> = prefs.screenOrientation
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "auto")
+    val brightness: StateFlow<Float> = prefs.brightness
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), -1f)
+
+    // ── 可视选项 StateFlow ─────────────────────────────
+    val textColor: StateFlow<String> = prefs.textColor
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val bgColor: StateFlow<String> = prefs.bgColor
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val fontBold: StateFlow<Boolean> = prefs.fontBold
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val fontItalic: StateFlow<Boolean> = prefs.fontItalic
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val fontUnderline: StateFlow<Boolean> = prefs.fontUnderline
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val fontShadow: StateFlow<Boolean> = prefs.fontShadow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val textJustify: StateFlow<Boolean> = prefs.textJustify
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val chineseLayout: StateFlow<Boolean> = prefs.chineseLayout
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val verticalMode: StateFlow<Boolean> = prefs.verticalMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val simplifiedTrad: StateFlow<String> = prefs.simplifiedTrad
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+    val paraSpacing: StateFlow<Float> = prefs.paraSpacing
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.7f)
+    val charSpacing: StateFlow<Float> = prefs.charSpacing
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+    val fontScale: StateFlow<Float> = prefs.fontScale
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+    val paddingH: StateFlow<Int> = prefs.paddingH
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20)
+    val paddingTop: StateFlow<Int> = prefs.paddingTop
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
+    val paddingBottom: StateFlow<Int> = prefs.paddingBottom
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
+    val pageAnimation: StateFlow<String> = prefs.pageAnimation
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+
+    // ── 控制选项 StateFlow ─────────────────────────────
+    val tapLeftAction: StateFlow<String> = prefs.tapLeftAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "prev_page")
+    val tapRightAction: StateFlow<String> = prefs.tapRightAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "next_page")
+    val tapCenterAction: StateFlow<String> = prefs.tapCenterAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "toggle_ui")
+    val tapZone: StateFlow<String> = prefs.tapZone
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "three_zone")
+    val nineZoneConfig: StateFlow<String> = prefs.nineZoneConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val longPressAction: StateFlow<String> = prefs.longPressAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "select_text")
+    val volumeUpAction: StateFlow<String> = prefs.volumeUpAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "prev_page")
+    val volumeDownAction: StateFlow<String> = prefs.volumeDownAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "next_page")
+    val swipeLeftAction: StateFlow<String> = prefs.swipeLeftAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+    val swipeRightAction: StateFlow<String> = prefs.swipeRightAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+    val swipeUpAction: StateFlow<String> = prefs.swipeUpAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+    val swipeDownAction: StateFlow<String> = prefs.swipeDownAction
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+
+    // ── 其他选项 StateFlow ─────────────────────────────
+    val keepScreenOn: StateFlow<Boolean> = prefs.keepScreenOn
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val edgeSwipeBrightness: StateFlow<Boolean> = prefs.edgeSwipeBrightness
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val edgeSwipeFontSize: StateFlow<Boolean> = prefs.edgeSwipeFontSize
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val smartIndent: StateFlow<Boolean> = prefs.smartIndent
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val removeExtraBlank: StateFlow<Boolean> = prefs.removeExtraBlank
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val blueLight: StateFlow<Boolean> = prefs.blueLight
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val blueLightAmount: StateFlow<Float> = prefs.blueLightAmount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.3f)
+    val showStatusBar: StateFlow<Boolean> = prefs.showStatusBar
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val keepLastLine: StateFlow<Boolean> = prefs.keepLastLine
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val readingReminder: StateFlow<Boolean> = prefs.readingReminder
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val readingReminderMins: StateFlow<Int> = prefs.readingReminderMins
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 30)
+    val ttsSplitMode: StateFlow<String> = prefs.ttsSplitMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "sentence")
+    val allowTiltFlip: StateFlow<Boolean> = prefs.allowTiltFlip
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val allowPinchFont: StateFlow<Boolean> = prefs.allowPinchFont
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val allowSwipeFlip: StateFlow<Boolean> = prefs.allowSwipeFlip
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val epubUseBookFont: StateFlow<Boolean> = prefs.epubUseBookFont
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val epubDisableCss: StateFlow<Boolean> = prefs.epubDisableCss
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val epubShowAnnotations: StateFlow<Boolean> = prefs.epubShowAnnotations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val translateEngine: StateFlow<String> = prefs.translateEngine
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "google")
+    val translateTargetLang: StateFlow<String> = prefs.translateTargetLang
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "zh-CN")
+    val nameReplacements: StateFlow<String> = prefs.nameReplacements
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    // ── 合并选项 StateFlow ────────────────────────────
+    val visualOptions: StateFlow<VisualOptions> = combine(
+        listOf<Flow<*>>(
+            fontSize, lineSpacing, fontFamily,
+        )
+    ) { arr ->
+        VisualOptions(
+            fontSize = arr[0] as Int,
+            lineSpacing = arr[1] as Float,
+            fontFamily = arr[2] as String,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), VisualOptions())
+    val controlOptions: StateFlow<ControlOptions> = combine(
+        listOf<Flow<*>>(
+            tapLeftAction, tapRightAction, tapCenterAction, longPressAction,
+            volumeUpAction, volumeDownAction, tapZone, nineZoneConfig,
+            swipeLeftAction, swipeRightAction, swipeUpAction, swipeDownAction,
+        )
+    ) { arr ->
+        ControlOptions(
+            tapLeftAction = arr[0] as String, tapRightAction = arr[1] as String,
+            tapCenterAction = arr[2] as String, longPressAction = arr[3] as String,
+            volumeUpAction = arr[4] as String, volumeDownAction = arr[5] as String,
+            tapZone = arr[6] as String, nineZoneConfig = arr[7] as String,
+            swipeLeftAction = arr[8] as String, swipeRightAction = arr[9] as String,
+            swipeUpAction = arr[10] as String, swipeDownAction = arr[11] as String,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ControlOptions())
+    val otherOptions: StateFlow<OtherOptions> = combine(
+        listOf<Flow<*>>(
+            showStatusBar, keepScreenOn, edgeSwipeBrightness, edgeSwipeFontSize,
+            keepLastLine, smartIndent, removeExtraBlank, blueLight, blueLightAmount,
+            readingReminder, readingReminderMins, ttsSplitMode, allowTiltFlip,
+            allowPinchFont, allowSwipeFlip, epubUseBookFont, epubDisableCss,
+            epubShowAnnotations,
+        )
+    ) { arr ->
+        OtherOptions(
+            showStatusBar = arr[0] as Boolean, keepScreenOn = arr[1] as Boolean,
+            edgeSwipeBrightness = arr[2] as Boolean, edgeSwipeFontSize = arr[3] as Boolean,
+            keepLastLine = arr[4] as Boolean, smartIndent = arr[5] as Boolean,
+            removeExtraBlank = arr[6] as Boolean, blueLight = arr[7] as Boolean,
+            blueLightAmount = arr[8] as Float,
+            readingReminder = arr[9] as Boolean, readingReminderMins = arr[10] as Int,
+            ttsSplitMode = arr[11] as String, allowTiltFlip = arr[12] as Boolean,
+            allowPinchFont = arr[13] as Boolean, allowSwipeFlip = arr[14] as Boolean,
+            epubUseBookFont = arr[15] as Boolean, epubDisableCss = arr[16] as Boolean,
+            epubShowAnnotations = arr[17] as Boolean,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OtherOptions())
 
     private val _ttsPlaying = MutableStateFlow(false)
     val ttsPlaying: StateFlow<Boolean> = _ttsPlaying
     private var _ttsJob: Job? = null
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var pendingTtsText: String? = null
+
+    private val _bookmarks = MutableStateFlow<List<Int>>(emptyList())
+    val bookmarks: StateFlow<List<Int>> = _bookmarks
 
     private val _annotations = MutableStateFlow<List<AnnotationEntity>>(emptyList())
     val annotations: StateFlow<List<AnnotationEntity>> = _annotations
 
+    private val _sessions = MutableStateFlow<List<ReadingSessionEntity>>(emptyList())
+    val sessions: StateFlow<List<ReadingSessionEntity>> = _sessions
+
     private var sessionStartMs: Long = 0L
+    private var sessionStartProgress: Float = 0f
+    private var sessionStartChars: Long = 0L
+
+    private var annotationsJob: Job? = null
+    private var sessionsJob: Job? = null
+
+    val coverUrl: String?
+        get() {
+            val b = _book.value ?: return null
+            return if (b.coverPath?.startsWith("http") == true) b.coverPath
+            else null
+        }
+
+    fun loadSessions(bookId: String) {
+        sessionsJob?.cancel()
+        sessionsJob = viewModelScope.launch(Dispatchers.IO) {
+            sessionDao.observeSessions(bookId).collect { _sessions.value = it }
+        }
+    }
+
+    fun toggleFavorite() {
+        val b = _book.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            bookDao.toggleFavorite(b.bookId)
+        }
+    }
 
     fun loadAnnotations(bookId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        annotationsJob?.cancel()
+        annotationsJob = viewModelScope.launch(Dispatchers.IO) {
             annotationDao.observeByBook(bookId).collect { _annotations.value = it }
         }
     }
@@ -90,6 +300,9 @@ class ReaderViewModel @Inject constructor(
             }
             _book.value = entity
             _progress.value = entity.progress
+
+            // 加载书签
+            _bookmarks.value = prefs.observeBookmarks(bookId).first()
 
             // 本地文件直接读取
             if (entity.filePath != null && File(entity.filePath).exists()) {
@@ -115,6 +328,22 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun toggleBookmark(page: Int) {
+        val bookId = _book.value?.bookId ?: return
+        val current = _bookmarks.value
+        viewModelScope.launch {
+            if (page in current) {
+                val updated = current - page
+                _bookmarks.value = updated
+                prefs.saveBookmarks(bookId, updated)
+            } else {
+                val updated = (current + page).distinct()
+                _bookmarks.value = updated
+                prefs.saveBookmarks(bookId, updated)
+            }
+        }
+    }
+
     fun saveProgress(locatorJson: String) {
         val bookId = _book.value?.bookId ?: return
         _progress.value = locatorJson
@@ -127,33 +356,146 @@ class ReaderViewModel @Inject constructor(
         val bookId = _book.value?.bookId ?: return
         _progress.value = page.toString()
         viewModelScope.launch(Dispatchers.IO) {
-            bookDao.updateProgressNumeric(bookId, page.toString())
+            bookDao.updateProgressNumeric(bookId, page.toString(), System.currentTimeMillis())
+        }
+    }
+
+    private fun safeTtsText(text: String): String {
+        val maxLen = (TextToSpeech.getMaxSpeechInputLength().coerceAtMost(3800))
+            .coerceAtMost(text.length)
+        return text.substring(0, maxLen)
+    }
+
+    private fun initTts() {
+        if (tts != null) return
+
+        tts = TextToSpeech(context) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            android.util.Log.d("BookNext", "TTS init status=$status ready=$ttsReady")
+            if (ttsReady) {
+                var langResult = tts?.setLanguage(Locale.CHINESE) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                android.util.Log.d("BookNext", "TTS setLanguage(CHINESE)=$langResult")
+                if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    langResult = tts?.setLanguage(Locale.CHINA) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                    android.util.Log.d("BookNext", "TTS setLanguage(CHINA)=$langResult")
+                }
+                val pending = pendingTtsText
+                pendingTtsText = null
+                if (pending != null) {
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {}
+                        override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
+                        override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
+                    })
+                    val safe = safeTtsText(pending)
+                    android.util.Log.d("BookNext", "TTS speaking ${safe.length} chars (was ${pending.length})")
+                    val result = tts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts")
+                    android.util.Log.d("BookNext", "TTS speak result=$result")
+                }
+            } else {
+                pendingTtsText = null
+            }
         }
     }
 
     fun startTts(text: String) {
-        _ttsJob?.cancel()
-        _ttsJob = viewModelScope.launch(Dispatchers.IO) {
+        val safe = safeTtsText(text)
+        android.util.Log.d("BookNext", "startTts ${safe.length}/${text.length} chars tts=$tts ttsReady=$ttsReady")
+        if (ttsReady && tts != null) {
             _ttsPlaying.value = true
-            try {
-                val req = com.booknext.app.data.remote.dto.TtsRequest(text = text)
-                val body = apiClient.api().tts(req)
-                val player = android.media.MediaPlayer()
-                val tmpFile = File(context.cacheDir, "tts_tmp.mp3")
-                tmpFile.outputStream().use { body.byteStream().copyTo(it) }
-                player.setDataSource(tmpFile.absolutePath)
-                player.prepare()
-                player.start()
-                player.setOnCompletionListener { _ttsPlaying.value = false; it.release() }
-            } catch (e: Exception) { _ttsPlaying.value = false }
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
+                override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
+            })
+            val result = tts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts")
+            android.util.Log.d("BookNext", "TTS speak result=$result")
+        } else if (tts == null) {
+            pendingTtsText = safe
+            _ttsPlaying.value = true
+            initTts()
+        } else {
+            pendingTtsText = safe
         }
     }
 
-    fun stopTts() { _ttsJob?.cancel(); _ttsPlaying.value = false }
+    fun stopTts() {
+        tts?.stop()
+        pendingTtsText = null
+        _ttsPlaying.value = false
+    }
+    fun setDarkMode(enabled: Boolean) {
+        android.util.Log.d("BookNext", "setDarkMode=$enabled")
+        viewModelScope.launch { prefs.saveDarkMode(enabled) }
+    }
+    fun setFontSize(size: Int) {
+        android.util.Log.d("BookNext", "setFontSize=$size")
+        viewModelScope.launch { prefs.saveFontSize(size) }
+    }
+    fun setScreenOrientation(orientation: String) {
+        android.util.Log.d("BookNext", "setScreenOrientation=$orientation")
+        viewModelScope.launch { prefs.saveScreenOrientation(orientation) }
+    }
+    fun setBrightness(value: Float) {
+        android.util.Log.d("BookNext", "setBrightness=$value")
+        viewModelScope.launch { prefs.saveBrightness(value) }
+    }
+    fun setNameReplacements(json: String) {
+        viewModelScope.launch { prefs.saveNameReplacements(json) }
+    }
+    fun setTranslateEngine(engine: String) {
+        viewModelScope.launch { prefs.saveTranslateEngine(engine) }
+    }
+    fun setTranslateTargetLang(lang: String) {
+        viewModelScope.launch { prefs.saveTranslateTargetLang(lang) }
+    }
+    fun getPageTextForCopy(): String {
+        return ""
+    }
+    fun saveVisualOptions(opt: com.booknext.app.ui.reader.options.VisualOptions) {
+        viewModelScope.launch {
+            prefs.saveVisualOptions(
+                fontSize = opt.fontSize, lineSpacing = opt.lineSpacing,
+                fontFamily = opt.fontFamily,
+            )
+        }
+    }
+    fun saveControlOptions(opt: com.booknext.app.ui.reader.options.ControlOptions) {
+        viewModelScope.launch {
+            prefs.saveControlOptions(
+                tapLeftAction = opt.tapLeftAction, tapRightAction = opt.tapRightAction,
+                tapCenterAction = opt.tapCenterAction, longPressAction = opt.longPressAction,
+                volumeUpAction = opt.volumeUpAction, volumeDownAction = opt.volumeDownAction,
+                tapZone = opt.tapZone, nineZoneConfig = opt.nineZoneConfig,
+                swipeLeftAction = opt.swipeLeftAction, swipeRightAction = opt.swipeRightAction,
+                swipeUpAction = opt.swipeUpAction, swipeDownAction = opt.swipeDownAction,
+            )
+        }
+    }
+    fun saveOtherOptions(opt: com.booknext.app.ui.reader.options.OtherOptions) {
+        viewModelScope.launch {
+            prefs.saveOtherOptions(
+                showStatusBar = opt.showStatusBar, keepScreenOn = opt.keepScreenOn,
+                edgeSwipeBrightness = opt.edgeSwipeBrightness,
+                edgeSwipeFontSize = opt.edgeSwipeFontSize,
+                keepLastLine = opt.keepLastLine, smartIndent = opt.smartIndent,
+                removeExtraBlank = opt.removeExtraBlank, blueLight = opt.blueLight,
+                blueLightAmount = opt.blueLightAmount,
+                readingReminder = opt.readingReminder,
+                readingReminderMins = opt.readingReminderMins,
+                ttsSplitMode = opt.ttsSplitMode, allowTiltFlip = opt.allowTiltFlip,
+                allowPinchFont = opt.allowPinchFont, allowSwipeFlip = opt.allowSwipeFlip,
+                epubUseBookFont = opt.epubUseBookFont, epubDisableCss = opt.epubDisableCss,
+                epubShowAnnotations = opt.epubShowAnnotations,
+            )
+        }
+    }
     fun clearError() { _state.value = ReaderState.Idle }
 
     private suspend fun deliverFile(entity: BookEntity, file: File) {
         sessionStartMs = System.currentTimeMillis()
+        sessionStartProgress = entity.readingPercent
+        sessionStartChars = estimateCharsRead(entity, file)
         viewModelScope.launch(Dispatchers.IO) {
             bookDao.updateLastReadAt(entity.bookId, System.currentTimeMillis())
         }
@@ -175,17 +517,68 @@ class ReaderViewModel @Inject constructor(
                 _state.value = ReaderState.Error("MOBI 转换失败：${e.message}")
             }
         } else {
-            _state.value = ReaderState.Ready(file, entity.format)
+            if (entity.format in listOf("doc", "docx")) {
+                val extracted = extractWordToTxt(file, context, entity.bookId)
+                _state.value = ReaderState.Ready(extracted ?: file, "txt")
+            } else {
+                _state.value = ReaderState.Ready(file, entity.format)
+            }
         }
     }
 
+    private fun extractWordToTxt(file: File, context: Context, bookId: String): File? {
+        return try {
+            val outFile = File(context.filesDir, "books/${bookId}_extracted.txt")
+            if (outFile.exists() && outFile.length() > 0) return outFile
+            val text = XWPFDocument(file.inputStream()).use { doc ->
+                doc.paragraphs.joinToString("\n") { it.text }
+            }
+            outFile.writeText(text)
+            outFile
+        } catch (e: Exception) { null }
+    }
+
+    private fun estimateTotalChars(book: BookEntity): Long {
+        return when (book.format) {
+            "txt" -> {
+                val f = File(context.filesDir, "books/${book.bookId}.txt")
+                if (f.exists()) f.length() / 2 else 100_000L
+            }
+            "epub" -> 100_000L
+            "pdf" -> (book.pageCount ?: 200) * 500L
+            else -> 50_000L
+        }
+    }
+
+    private fun estimateCharsRead(entity: BookEntity, file: File): Long {
+        return (entity.readingPercent * estimateTotalChars(entity)).toLong()
+    }
+
     override fun onCleared() {
+        tts?.shutdown()
+        tts = null
         super.onCleared()
         val bookId = _book.value?.bookId ?: return
         val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1000
+        val endProgress = _book.value?.readingPercent ?: 0f
+        val bookSnapshot = _book.value ?: return
+
         if (elapsed > 5) {
-            viewModelScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
                 bookDao.addReadingTime(bookId, elapsed)
+                val charsRead = ((endProgress - sessionStartProgress) * estimateTotalChars(bookSnapshot)).toLong()
+                    .coerceAtLeast(0L)
+                val wpm = if (elapsed > 0) ((charsRead / elapsed.toFloat()) * 60).toInt() else 0
+                val session = ReadingSessionEntity(
+                    id = java.util.UUID.randomUUID().toString(),
+                    bookId = bookId,
+                    startTime = sessionStartMs,
+                    durationSeconds = elapsed,
+                    progressPercent = endProgress,
+                    wordsPerMinute = wpm,
+                    charsRead = charsRead,
+                )
+                sessionDao.insert(session)
             }
         }
     }

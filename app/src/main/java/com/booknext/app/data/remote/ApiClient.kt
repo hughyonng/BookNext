@@ -3,7 +3,6 @@ package com.booknext.app.data.remote
 import com.booknext.app.data.local.prefs.UserPreferences
 import com.booknext.app.data.remote.api.BookNextApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -17,13 +16,19 @@ class ApiClient @Inject constructor(
     private val baseRetrofit: Retrofit,
     private val baseOkHttpClient: OkHttpClient,
 ) {
-    fun api(): BookNextApi {
-        val (url, key) = runBlocking {
-            val u = prefs.serverUrl.first().trimEnd('/') + "/"
-            val k = prefs.apiKey.first()
-            Pair(u, k)
+    private var cachedUrl = ""
+    private var cachedKey = ""
+    private var cachedApi: BookNextApi? = null
+
+    suspend fun api(): BookNextApi {
+        val url = prefs.serverUrl.first().trimEnd('/') + "/"
+        val key = prefs.apiKey.first()
+        if (url == cachedUrl && key == cachedKey && cachedApi != null) {
+            return cachedApi!!
         }
-        return baseRetrofit.newBuilder()
+        cachedUrl = url
+        cachedKey = key
+        cachedApi = baseRetrofit.newBuilder()
             .baseUrl(url)
             .client(
                 baseOkHttpClient.newBuilder()
@@ -32,6 +37,7 @@ class ApiClient @Inject constructor(
             )
             .build()
             .create(BookNextApi::class.java)
+        return cachedApi!!
     }
 }
 

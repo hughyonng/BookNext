@@ -37,8 +37,6 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 
 enum class SortOrder { TITLE, AUTHOR, UPLOAD_TIME, LAST_READ, ONLINE_ONLY, LOCAL_ONLY }
 enum class LayoutMode { GRID_3, GRID_4, LIST }
@@ -67,8 +65,9 @@ fun BookshelfScreen(
     val prefs = remember {
         EntryPointAccessors.fromApplication(context.applicationContext, PrefsEntryPoint::class.java).prefs()
     }
-    val baseUrl = remember { runBlocking { prefs.serverUrl.first().trimEnd('/') } }
-    val apiKey = remember { runBlocking { prefs.apiKey.first() } }
+    val rawUrl by prefs.serverUrl.collectAsState(initial = "")
+    val apiKey by prefs.apiKey.collectAsState(initial = "")
+    val baseUrl = remember(rawUrl) { rawUrl.trimEnd('/') }
 
     var isSearching by remember { mutableStateOf(false) }
     var selectedBooks by remember { mutableStateOf<Set<String>>(emptySet()) }

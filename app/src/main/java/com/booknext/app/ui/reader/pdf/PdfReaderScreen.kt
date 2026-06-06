@@ -4,40 +4,65 @@ import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.booknext.app.data.local.db.BookEntity
+import com.booknext.app.data.local.db.ReadingSessionEntity
+import com.booknext.app.ui.reader.ReaderToolbarOverlay
+import com.booknext.app.ui.reader.ReaderToolbarState
+import com.booknext.app.ui.reader.readerGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val pdfRenderMutex = Mutex()
+
 @Composable
 fun PdfReaderScreen(
     file: File,
     title: String,
-    initialPage: Int,
-    onBack: () -> Unit,
-    onProgressChange: (Int) -> Unit,
+    initialPage: Int = 0,
+    onBack: () -> Unit = {},
+    onProgressChange: (Int) -> Unit = {},
+    onDarkModeChange: (Boolean) -> Unit = {},
+    onFontSizeChange: (Int) -> Unit = {},
+    onOrientationChange: (String) -> Unit = {},
+    onBrightnessChange: (Float) -> Unit = {},
+    onToggleUI: () -> Unit = {},
+    book: BookEntity? = null,
+    sessions: List<ReadingSessionEntity> = emptyList(),
+    coverUrl: String? = null,
+    onToggleFavorite: () -> Unit = {},
+    currentVisualOptions: com.booknext.app.ui.reader.options.VisualOptions = com.booknext.app.ui.reader.options.VisualOptions(),
+    currentControlOptions: com.booknext.app.ui.reader.options.ControlOptions = com.booknext.app.ui.reader.options.ControlOptions(),
+    currentOtherOptions: com.booknext.app.ui.reader.options.OtherOptions = com.booknext.app.ui.reader.options.OtherOptions(),
+    onSaveVisualOptions: (com.booknext.app.ui.reader.options.VisualOptions) -> Unit = {},
+    onSaveControlOptions: (com.booknext.app.ui.reader.options.ControlOptions) -> Unit = {},
+    onSaveOtherOptions: (com.booknext.app.ui.reader.options.OtherOptions) -> Unit = {},
+    bookmarks: List<Int> = emptyList(),
+    onAddBookmark: (Int) -> Unit = {},
+    onPrevChapter: () -> Unit = {},
+    onNextChapter: () -> Unit = {},
+    onPageTextCopy: () -> Unit = {},
+    onBookmarkManage: () -> Unit = {},
 ) {
     var currentPage by remember { mutableIntStateOf(initialPage) }
     var totalPages by remember { mutableIntStateOf(0) }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var dragDelta by remember { mutableFloatStateOf(0f) }
     var scrollMode by remember { mutableStateOf(false) }
+    var uiVisible by remember { mutableStateOf(true) }
 
     val renderer = remember(file) {
         PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY))
@@ -45,18 +70,20 @@ fun PdfReaderScreen(
     var pageBitmaps = remember { mutableStateListOf<Bitmap?>() }
     val scope = rememberCoroutineScope()
 
-    DisposableEffect(renderer) {
+    DisposableEffect(renderer, scrollMode) {
         totalPages = renderer.pageCount
-        // pre-render all pages for scroll mode
         if (scrollMode) {
-            scope.launch(Dispatchers.IO) {
+            scope.launch {
                 for (i in pageBitmaps.size until renderer.pageCount) {
-                    val bmp = renderPage(renderer, i)
+                    val bmp = withContext(Dispatchers.IO) { renderPage(renderer, i) }
                     pageBitmaps.add(bmp)
                 }
             }
         }
-        onDispose { renderer.close() }
+        onDispose {
+            pageBitmaps.forEach { it?.recycle() }
+            renderer.close()
+        }
     }
 
     LaunchedEffect(currentPage, renderer, scrollMode) {
@@ -75,38 +102,7 @@ fun PdfReaderScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title, maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = { scrollMode = !scrollMode }) {
-                        Text(if (scrollMode) "单页" else "滚动", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            if (!scrollMode) {
-                BottomAppBar {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = { goPage(-1) }, enabled = currentPage > 0) { Text("◀") }
-                        Text("${currentPage + 1} / $totalPages")
-                        IconButton(onClick = { goPage(1) }, enabled = currentPage < totalPages - 1) { Text("▶") }
-                    }
-                }
-            }
-        }
-    ) { padding ->
+    Box(Modifier.fillMaxSize()) {
         if (scrollMode) {
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentPage)
 
@@ -117,27 +113,27 @@ fun PdfReaderScreen(
                 }
             }
 
-            // Lazy pre-render
             LaunchedEffect(listState.layoutInfo.visibleItemsInfo) {
-                scope.launch(Dispatchers.IO) {
-                    val visibleIndices = listState.layoutInfo.visibleItemsInfo.map { it.index }
-                    for (idx in visibleIndices) {
-                        while (idx >= pageBitmaps.size) {
-                            // Fill in gaps
-                            val i = pageBitmaps.size
-                            if (i < totalPages) {
-                                val bmp = renderPage(renderer, i)
-                                pageBitmaps.add(bmp)
-                            } else break
-                        }
+                val visibleIndices = listState.layoutInfo.visibleItemsInfo.map { it.index }
+                val keepRange = ((visibleIndices.minOrNull() ?: 0) - 3)..
+                                ((visibleIndices.maxOrNull() ?: 0) + 3)
+                for (i in pageBitmaps.indices) {
+                    if (i !in keepRange && pageBitmaps[i] != null) {
+                        pageBitmaps[i]?.recycle()
+                        pageBitmaps[i] = null
+                    }
+                }
+                for (idx in visibleIndices) {
+                    while (idx >= pageBitmaps.size) {
+                        val i = pageBitmaps.size
+                        if (i >= totalPages) break
+                        val bmp = withContext(Dispatchers.IO) { renderPage(renderer, i) }
+                        pageBitmaps.add(bmp)
                     }
                 }
             }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            ) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(totalPages) { i ->
                     if (i < pageBitmaps.size && pageBitmaps[i] != null) {
                         Image(
@@ -160,18 +156,12 @@ fun PdfReaderScreen(
             }
         } else {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragDelta = 0f },
-                            onHorizontalDrag = { _, delta -> dragDelta += delta },
-                            onDragEnd = {
-                                if (dragDelta < -80f) goPage(1)
-                                else if (dragDelta > 80f) goPage(-1)
-                                dragDelta = 0f
-                            }
-                        )
-                    },
+                modifier = Modifier.fillMaxSize()
+                    .readerGestures(
+                        onPrevPage = { goPage(-1) },
+                        onNextPage = { goPage(1) },
+                        onToggleUI = { uiVisible = !uiVisible },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 bitmap?.let {
@@ -184,18 +174,57 @@ fun PdfReaderScreen(
                 } ?: CircularProgressIndicator()
             }
         }
+
+        ReaderToolbarOverlay(
+            modifier = Modifier.zIndex(1f),
+            state = ReaderToolbarState(
+                title = title,
+                currentPage = currentPage,
+                totalPages = totalPages,
+                bookmarks = bookmarks,
+            ),
+            visible = uiVisible,
+            onBack = onBack,
+            onDarkModeChange = onDarkModeChange,
+            onFontSizeChange = onFontSizeChange,
+            onBrightnessChange = onBrightnessChange,
+            onOrientationChange = onOrientationChange,
+            onPageChange = { goPage(it - currentPage) },
+            onTtsStart = {},
+            onTtsStop = {},
+            onTocJump = { goPage(it - currentPage) },
+            onAddBookmark = { onAddBookmark(currentPage) },
+            onAutoScroll = { _, _ -> scrollMode = true },
+            onSearch = { _, _ -> },
+            onPrevChapter = onPrevChapter,
+            onNextChapter = onNextChapter,
+            onPageTextCopy = onPageTextCopy,
+            onBookmarkManage = onBookmarkManage,
+            book = book,
+            sessions = sessions,
+            coverUrl = coverUrl,
+            onToggleFavorite = onToggleFavorite,
+            currentVisualOptions = currentVisualOptions,
+            currentControlOptions = currentControlOptions,
+            currentOtherOptions = currentOtherOptions,
+            onSaveVisualOptions = onSaveVisualOptions,
+            onSaveControlOptions = onSaveControlOptions,
+            onSaveOtherOptions = onSaveOtherOptions,
+        )
     }
 }
 
-fun renderPage(renderer: PdfRenderer, pageIndex: Int): Bitmap? {
+suspend fun renderPage(renderer: PdfRenderer, pageIndex: Int): Bitmap? {
     if (pageIndex < 0 || pageIndex >= renderer.pageCount) return null
-    return try {
-        val page = renderer.openPage(pageIndex)
-        val w = 1080
-        val h = (w * page.height.toFloat() / page.width).toInt().coerceAtLeast(1)
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-        page.close()
-        bmp
-    } catch (_: Exception) { null }
+    return pdfRenderMutex.withLock {
+        try {
+            val page = renderer.openPage(pageIndex)
+            val w = 1080
+            val h = (w * page.height.toFloat() / page.width).toInt().coerceAtLeast(1)
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            page.close()
+            bmp
+        } catch (_: Exception) { null }
+    }
 }
