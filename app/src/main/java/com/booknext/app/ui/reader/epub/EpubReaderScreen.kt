@@ -1,6 +1,10 @@
 package com.booknext.app.ui.reader.epub
 
 import android.os.Bundle
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -30,6 +34,12 @@ import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
 
+private val MENU_HIGHLIGHT = Menu.FIRST + 1
+private val MENU_NOTE = Menu.FIRST + 2
+private val MENU_TRANSLATE = Menu.FIRST + 3
+private val MENU_DICT = Menu.FIRST + 4
+private val MENU_TTS = Menu.FIRST + 5
+
 @Composable
 fun EpubReaderScreen(
     file: File,
@@ -52,6 +62,9 @@ fun EpubReaderScreen(
     onSetTranslateTargetLang: (String) -> Unit = {},
     onTranslateText: () -> Unit = {},
     onDictionaryLookup: () -> Unit = {},
+    onAnnotationsClick: () -> Unit = {},
+    onNoteClick: () -> Unit = {},
+    onTextLongPress: (String) -> Unit = {},
     book: BookEntity? = null,
     sessions: List<ReadingSessionEntity> = emptyList(),
     coverUrl: String? = null,
@@ -84,6 +97,12 @@ fun EpubReaderScreen(
     onChapterText = { ttsChapterText = it },
     lineSpacing = currentVisualOptions.lineSpacing,
     fontFamilyValue = currentVisualOptions.fontFamily,
+    onTextLongPress = onTextLongPress,
+    onTranslateText = onTranslateText,
+    onDictionaryLookup = onDictionaryLookup,
+    onAnnotationsClick = onAnnotationsClick,
+    onNoteClick = onNoteClick,
+    onTtsRequest = onTtsRequest,
     modifier = Modifier.fillMaxSize(),
         )
         }
@@ -152,6 +171,12 @@ fun EpubReaderWrapper(
     onTocEntries: (List<TocEntry>) -> Unit = {},
     onTotalPages: (Int) -> Unit = {},
     onChapterText: (String) -> Unit = {},
+    onTextLongPress: (String) -> Unit = {},
+    onTranslateText: () -> Unit = {},
+    onDictionaryLookup: () -> Unit = {},
+    onAnnotationsClick: () -> Unit = {},
+    onNoteClick: () -> Unit = {},
+    onTtsRequest: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current
@@ -188,6 +213,58 @@ fun EpubReaderWrapper(
                     }
                     return super.dispatchTouchEvent(event)
                 }
+                override fun startActionModeForChild(child: android.view.View?, callback: ActionMode.Callback?): ActionMode? {
+                    val fl = this
+                    val wrapped = if (callback != null) object : ActionMode.Callback {
+                        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                            val r = callback.onCreateActionMode(mode, menu)
+                            // 添加自定义按钮
+                            if (menu.findItem(MENU_HIGHLIGHT) == null) {
+                                menu.add(Menu.NONE, MENU_HIGHLIGHT, 1, "高亮")
+                                menu.add(Menu.NONE, MENU_NOTE, 2, "笔记")
+                                menu.add(Menu.NONE, MENU_TRANSLATE, 3, "翻译")
+                                menu.add(Menu.NONE, MENU_DICT, 4, "词典")
+                                menu.add(Menu.NONE, MENU_TTS, 5, "朗读")
+                            }
+                            return r
+                        }
+                        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                            return callback.onPrepareActionMode(mode, menu)
+                        }
+                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                            if (callback.onActionItemClicked(mode, item)) return true
+                            // 获取 WebView 选中文本
+                            fun findWebView(v: android.view.View): WebView? {
+                                if (v is WebView) return v
+                                if (v is android.view.ViewGroup) {
+                                    for (i in 0 until v.childCount) {
+                                        findWebView(v.getChildAt(i))?.let { return it }
+                                    }
+                                }
+                                return null
+                            }
+                            val wv = findWebView(fl)
+                            wv?.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
+                                val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
+                                kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
+                                    onTextLongPress(text)
+                                    when (item.itemId) {
+                                        MENU_HIGHLIGHT -> onAnnotationsClick()
+                                        MENU_NOTE -> onNoteClick()
+                                        MENU_TRANSLATE -> onTranslateText()
+                                        MENU_DICT -> onDictionaryLookup()
+                                        MENU_TTS -> { onTtsRequest(text); mode.finish() }
+                                    }
+                                }
+                            }
+                            return true
+                        }
+                        override fun onDestroyActionMode(mode: ActionMode) {
+                            callback.onDestroyActionMode(mode)
+                        }
+                    } else null
+                    return super.startActionModeForChild(child, wrapped)
+                }
             }.apply { id = android.view.View.generateViewId() }
 
             scope.launch {
@@ -205,6 +282,12 @@ fun EpubReaderWrapper(
                     onTocEntries = onTocEntries,
                     onTotalPages = onTotalPages,
                     onChapterText = onChapterText,
+                    onTextLongPress = onTextLongPress,
+                    onTranslateText = onTranslateText,
+                    onDictionaryLookup = onDictionaryLookup,
+                    onAnnotationsClick = onAnnotationsClick,
+                    onNoteClick = onNoteClick,
+                    onTtsRequest = onTtsRequest,
                     onError = { msg -> error = msg },
                     )
                 } catch (e: Exception) {
@@ -230,6 +313,12 @@ private suspend fun openEpubPublication(
     onTocEntries: (List<TocEntry>) -> Unit = {},
     onTotalPages: (Int) -> Unit = {},
     onChapterText: (String) -> Unit = {},
+    onTextLongPress: (String) -> Unit = {},
+    onTranslateText: () -> Unit = {},
+    onDictionaryLookup: () -> Unit = {},
+    onAnnotationsClick: () -> Unit = {},
+    onNoteClick: () -> Unit = {},
+    onTtsRequest: (String) -> Unit = {},
     onError: (String) -> Unit,
 ) {
     val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()

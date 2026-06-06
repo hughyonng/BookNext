@@ -174,6 +174,15 @@ fun ReaderScreen(
                                     }
                                 }
                             },
+                            onAnnotationsClick = {
+                                if (selectedText.isNotEmpty()) showAnnotationDialog = true
+                                else showSidebar = true
+                            },
+                            onNoteClick = { showNoteDialog = true },
+                            onTextLongPress = { text ->
+                                selectedText = text
+                                selectedLocator = "epub_sel"
+                            },
                         )
                         "txt", "mobi", "azw3" -> TxtReaderScreen(
                             file = s.file,
