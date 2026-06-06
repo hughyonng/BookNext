@@ -1,16 +1,15 @@
 package com.booknext.app.ui.reader.epub
 
 import android.os.Bundle
-import android.view.ActionMode
-import android.view.Menu
-import android.view.MenuItem
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
 import com.booknext.app.LocalActivity
@@ -33,12 +32,6 @@ import org.readium.r2.shared.util.mediatype.MediaType
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
-
-private val MENU_HIGHLIGHT = Menu.FIRST + 1
-private val MENU_NOTE = Menu.FIRST + 2
-private val MENU_TRANSLATE = Menu.FIRST + 3
-private val MENU_DICT = Menu.FIRST + 4
-private val MENU_TTS = Menu.FIRST + 5
 
 @Composable
 fun EpubReaderScreen(
@@ -83,6 +76,9 @@ fun EpubReaderScreen(
     var tocEntries by remember { mutableStateOf<List<TocEntry>>(emptyList()) }
     var epubTtsPlaying by remember { mutableStateOf(false) }
     var ttsChapterText by remember { mutableStateOf("") }
+    // 浮层按钮状态
+    var showFloatingMenu by remember { mutableStateOf(false) }
+    var floatingText by remember { mutableStateOf("") }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -103,6 +99,10 @@ fun EpubReaderScreen(
     onAnnotationsClick = onAnnotationsClick,
     onNoteClick = onNoteClick,
     onTtsRequest = onTtsRequest,
+    onSelectionChanged = { text ->
+        floatingText = text
+        showFloatingMenu = text.isNotEmpty()
+    },
     modifier = Modifier.fillMaxSize(),
         )
         }
@@ -155,6 +155,48 @@ fun EpubReaderScreen(
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
         )
+        // 浮动菜单
+        if (showFloatingMenu) {
+            Column(
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    shadowElevation = 6.dp,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp,
+                ) {
+                    Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        TextButton(onClick = {
+                            showFloatingMenu = false
+                            onTextLongPress(floatingText)
+                            onAnnotationsClick()
+                        }) { Text("高亮") }
+                        TextButton(onClick = {
+                            showFloatingMenu = false
+                            onTextLongPress(floatingText)
+                            onNoteClick()
+                        }) { Text("笔记") }
+                        TextButton(onClick = {
+                            showFloatingMenu = false
+                            onTextLongPress(floatingText)
+                            onTranslateText()
+                        }) { Text("翻译") }
+                        TextButton(onClick = {
+                            showFloatingMenu = false
+                            onTextLongPress(floatingText)
+                            onDictionaryLookup()
+                        }) { Text("词典") }
+                        TextButton(onClick = {
+                            showFloatingMenu = false
+                            onTtsRequest(floatingText)
+                        }) { Text("朗读") }
+                        TextButton(onClick = { showFloatingMenu = false }) { Text("✕") }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -177,6 +219,7 @@ fun EpubReaderWrapper(
     onAnnotationsClick: () -> Unit = {},
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
+    onSelectionChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current
@@ -206,64 +249,11 @@ fun EpubReaderWrapper(
                         val x = event.x
                         val dy = kotlin.math.abs(event.y - downY)
                         val dt = event.eventTime - downTime
-                        // 长按（>300ms）表示选择文字，不触发 toggle
                         if (x >= w * 0.25f && x <= w * 0.75f && dy < 8f && dt < 300L) {
                             onToggleUI()
                         }
                     }
                     return super.dispatchTouchEvent(event)
-                }
-                override fun startActionModeForChild(child: android.view.View?, callback: ActionMode.Callback?): ActionMode? {
-                    val fl = this
-                    val wrapped = if (callback != null) object : ActionMode.Callback {
-                        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                            val r = callback.onCreateActionMode(mode, menu)
-                            // 添加自定义按钮
-                            if (menu.findItem(MENU_HIGHLIGHT) == null) {
-                                menu.add(Menu.NONE, MENU_HIGHLIGHT, 1, "高亮")
-                                menu.add(Menu.NONE, MENU_NOTE, 2, "笔记")
-                                menu.add(Menu.NONE, MENU_TRANSLATE, 3, "翻译")
-                                menu.add(Menu.NONE, MENU_DICT, 4, "词典")
-                                menu.add(Menu.NONE, MENU_TTS, 5, "朗读")
-                            }
-                            return r
-                        }
-                        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-                            return callback.onPrepareActionMode(mode, menu)
-                        }
-                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                            if (callback.onActionItemClicked(mode, item)) return true
-                            // 获取 WebView 选中文本
-                            fun findWebView(v: android.view.View): WebView? {
-                                if (v is WebView) return v
-                                if (v is android.view.ViewGroup) {
-                                    for (i in 0 until v.childCount) {
-                                        findWebView(v.getChildAt(i))?.let { return it }
-                                    }
-                                }
-                                return null
-                            }
-                            val wv = findWebView(fl)
-                            wv?.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
-                                val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
-                                kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
-                                    onTextLongPress(text)
-                                    when (item.itemId) {
-                                        MENU_HIGHLIGHT -> onAnnotationsClick()
-                                        MENU_NOTE -> onNoteClick()
-                                        MENU_TRANSLATE -> onTranslateText()
-                                        MENU_DICT -> onDictionaryLookup()
-                                        MENU_TTS -> { onTtsRequest(text); mode.finish() }
-                                    }
-                                }
-                            }
-                            return true
-                        }
-                        override fun onDestroyActionMode(mode: ActionMode) {
-                            callback.onDestroyActionMode(mode)
-                        }
-                    } else null
-                    return super.startActionModeForChild(child, wrapped)
                 }
             }.apply { id = android.view.View.generateViewId() }
 
@@ -288,6 +278,7 @@ fun EpubReaderWrapper(
                     onAnnotationsClick = onAnnotationsClick,
                     onNoteClick = onNoteClick,
                     onTtsRequest = onTtsRequest,
+                    onSelectionChanged = onSelectionChanged,
                     onError = { msg -> error = msg },
                     )
                 } catch (e: Exception) {
@@ -319,6 +310,7 @@ private suspend fun openEpubPublication(
     onAnnotationsClick: () -> Unit = {},
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
+    onSelectionChanged: (String) -> Unit = {},
     onError: (String) -> Unit,
 ) {
     val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()
@@ -437,5 +429,38 @@ private suspend fun openEpubPublication(
             .setReorderingAllowed(true)
             .replace(container.id, EpubNavigatorFragment::class.java, Bundle())
             .commitAllowingStateLoss()
+        // 找 WebView 注入文字选择检测
+        container.postDelayed({
+            fun findWebView(v: android.view.View): WebView? {
+                if (v is WebView) return v
+                if (v is android.view.ViewGroup) {
+                    for (i in 0 until v.childCount) {
+                        findWebView(v.getChildAt(i))?.let { return it }
+                    }
+                }
+                return null
+            }
+            val wv = findWebView(container) ?: return@postDelayed
+            android.util.Log.d("BookNext", "EPUB WebView found, injecting selection bridge")
+            // 通过轮询检测选择：每 300ms 检查一次选中文本
+            val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
+            var lastSel = ""
+            val pollRunnable = object : Runnable {
+                override fun run() {
+                    wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
+                        val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
+                        if (text != lastSel) {
+                            lastSel = text
+                            kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
+                                onSelectionChanged(text)
+                                if (text.isNotEmpty()) onTextLongPress(text)
+                            }
+                        }
+                    }
+                    pollHandler.postDelayed(this, 300)
+                }
+            }
+            pollHandler.post(pollRunnable)
+        }, 500)
     }
 }
