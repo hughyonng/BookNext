@@ -49,6 +49,7 @@ private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
 private var epubSearchIndex: List<Pair<Int, String>>? = null
 private var epubPendingHighlight: String = ""
+private var epubHighlightRetries: Int = 0
 
 private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
@@ -246,6 +247,14 @@ fun EpubReaderScreen(
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("搜索: $epubSearchQuery", color = srFg, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                         Text("共 ${epubSearchMatches.size} 个结果", color = srFg.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
+                        TextButton(onClick = {
+                            showEpubSearchResults = false
+                            showEpubBackToResults = false
+                            epubSearchQuery = ""
+                            epubSearchMatches = emptyList()
+                            epubPendingHighlight = ""
+                            epubHighlightRetries = 0
+                        }) { Text("清除", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
                         IconButton(onClick = { showEpubSearchResults = false; showEpubBackToResults = true }) { Icon(Icons.Default.Close, "关闭", tint = srFg) }
                     }
                     HorizontalDivider(color = srFg.copy(alpha = 0.2f))
@@ -639,16 +648,23 @@ private suspend fun openEpubPublication(
             var lastHighlighted = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
-                    // 搜索高亮注入（导航到新章节后执行）
+                    // 搜索高亮注入（连续注射5轮确保新页面加载后命中）
                     val pending = epubPendingHighlight
-                    if (pending.isNotEmpty() && pending != lastHighlighted) {
-                        lastHighlighted = pending
-                        epubPendingHighlight = ""
-                        val q = pending.replace("'", "\\'")
-                        wv.evaluateJavascript(
-                            "(function(){var q='" + q + "';if(!q)return;var body=document.body;var walk=document.createTreeWalker(body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(after,n);p.insertBefore(mark,n);p.insertBefore(before,n);p.removeChild(n);}})();",
-                            null,
-                        )
+                    if (pending.isNotEmpty()) {
+                        if (pending != lastHighlighted) {
+                            lastHighlighted = pending
+                            epubHighlightRetries = 5
+                        }
+                        if (epubHighlightRetries > 0) {
+                            epubHighlightRetries--
+                            val q = pending.replace("'", "\\'")
+                            wv.evaluateJavascript(
+                                "(function(){var q='" + q + "';if(!q)return;var walk=document.createTreeWalker(document.body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(after,n);p.insertBefore(mark,n);p.insertBefore(before,n);p.removeChild(n);}})();",
+                                null,
+                            )
+                        }
+                    } else {
+                        lastHighlighted = ""
                     }
                     // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
