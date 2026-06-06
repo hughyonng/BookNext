@@ -149,14 +149,14 @@ fun EpubReaderScreen(
                 val pub = epubPublicationRef
                 if (nav != null && pub != null) {
                     scope.launch(Dispatchers.Main) {
-                        val link = pub.readingOrder.getOrNull(idx)
-                        if (link != null) {
-                            val locator = Locator(
-                                href = org.readium.r2.shared.util.Url(link.href.toString())!!,
-                                mediaType = link.mediaType ?: MediaType.EPUB,
-                            )
-                            nav.go(locator, animated = false)
-                        }
+                        val link = pub.readingOrder.getOrNull(idx) ?: return@launch
+                        val hrefStr = link.href.toString()
+                        val url = org.readium.r2.shared.util.Url(hrefStr) ?: return@launch
+                        val locator = Locator(
+                            href = url,
+                            mediaType = link.mediaType ?: MediaType.EPUB,
+                        )
+                        nav.go(locator, animated = false)
                     }
                 }
             },
@@ -414,8 +414,8 @@ private suspend fun openEpubPublication(
         for (link in links) {
             val title = link.title?.toString()?.trim()?.takeIf { it.isNotBlank() }
             if (title != null) {
-                val href = link.href
-                val idx = publication.readingOrder.indexOfFirst { it.href == href }.coerceAtLeast(0)
+                val href = link.href.toString().split('#')[0] // 去掉锚点
+                val idx = publication.readingOrder.indexOfFirst { it.href.toString().split('#')[0] == href }.coerceAtLeast(0)
                 result.add(TocEntry(title = title, index = idx))
             }
             result.addAll(flattenToc(link.children))
