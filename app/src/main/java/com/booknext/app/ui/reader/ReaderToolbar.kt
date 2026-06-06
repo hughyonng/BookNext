@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -92,6 +94,7 @@ fun ReaderToolbarOverlay(
     onSetTranslateTargetLang: (String) -> Unit = {},
     onTranslateText: () -> Unit = {},
     onDictionaryLookup: () -> Unit = {},
+    onSetReaderBgColor: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -110,6 +113,7 @@ fun ReaderToolbarOverlay(
     var showNameReplace by remember { mutableStateOf(false) }
     var showShare by remember { mutableStateOf(false) }
     var showTranslateSettings by remember { mutableStateOf(false) }
+    var showBgColor by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
 
@@ -163,6 +167,7 @@ fun ReaderToolbarOverlay(
                                 "目录" to "Toc",
                                 "书签" to "Bookmarks",
                                 "搜索" to "Search",
+                                "背景" to "BgColor",
                                 "词典" to "Dictionary",
                                 "翻译设置" to "TranslateSettings",
                             ).forEach { (label, action) ->
@@ -175,6 +180,7 @@ fun ReaderToolbarOverlay(
                                             "Toc" -> showToc = true
                                             "Bookmarks" -> showBookmarks = true
                                             "Search" -> { showSearchBar = true; onSearchRequest() }
+                                            "BgColor" -> showBgColor = true
                                             "Dictionary" -> onDictionaryLookup()
                                             "TranslateSettings" -> showTranslateSettings = true
                                         }
@@ -357,6 +363,14 @@ fun ReaderToolbarOverlay(
                     onDismiss = { showTranslateSettings = false },
                 )
             }
+        }
+
+        if (showBgColor) {
+            BgColorDialog(
+                onSelect = { hex -> onSetReaderBgColor(hex); showBgColor = false },
+                onReset = { onSetReaderBgColor(""); showBgColor = false },
+                onDismiss = { showBgColor = false },
+            )
         }
 
         if (showSearchBar) {
@@ -793,4 +807,68 @@ fun applyBrightness(activity: Activity?, value: Float) {
     val attrs = window.attributes
     attrs.screenBrightness = if (value < 0f) WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE else value
     window.attributes = attrs
+}
+
+private data class BgColorOption(val label: String, val colorHex: String)
+private val BG_COLORS = listOf(
+    BgColorOption("默认白", "#FFF9F7F4"),
+    BgColorOption("护眼绿", "#FFC7EDCC"),
+    BgColorOption("羊皮纸", "#FFF5F0E8"),
+    BgColorOption("浅灰", "#FFE8E8E8"),
+    BgColorOption("豆沙绿", "#FFB7C9B7"),
+    BgColorOption("深色", "#FF1A1814"),
+)
+
+@Composable
+private fun BgColorDialog(
+    onSelect: (String) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("阅读背景", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    BG_COLORS.take(3).forEach { opt ->
+                        BgColorCircle(opt, onSelect)
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    BG_COLORS.drop(3).forEach { opt ->
+                        BgColorCircle(opt, onSelect)
+                    }
+                }
+                TextButton(onClick = onReset, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text("跟随系统", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
+private fun BgColorCircle(opt: BgColorOption, onSelect: (String) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp)) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(try { Color(android.graphics.Color.parseColor(opt.colorHex)) } catch (_: Exception) { Color.Gray })
+                .clickable { onSelect(opt.colorHex) }
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(opt.label, style = MaterialTheme.typography.labelSmall)
+    }
 }

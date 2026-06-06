@@ -55,6 +55,7 @@ fun ReaderScreen(
     val readerVisualOptions by viewModel.visualOptions.collectAsState()
     val readerControlOptions by viewModel.controlOptions.collectAsState()
     val readerOtherOptions by viewModel.otherOptions.collectAsState()
+    val readerBgColor by viewModel.bgColor.collectAsState()
 
     val context = LocalContext.current
     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -183,6 +184,7 @@ fun ReaderScreen(
                                 selectedText = text
                                 selectedLocator = "epub_sel"
                             },
+                            onSetReaderBgColor = { viewModel.setBgColor(it) },
                         )
                         "txt", "mobi", "azw3" -> TxtReaderScreen(
                             file = s.file,
@@ -253,6 +255,8 @@ fun ReaderScreen(
                                     }
                                 }
                             },
+                            readerBgColor = readerBgColor,
+                            onSetReaderBgColor = { viewModel.setBgColor(it) },
                         )
                         "docx", "doc" -> TxtReaderScreen(
                             file = s.file,

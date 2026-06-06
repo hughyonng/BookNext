@@ -88,6 +88,8 @@ fun TxtReaderScreen(
     onToggleFavorite: () -> Unit = {},
     onPrevChapter: () -> Unit = {},
     onNextChapter: () -> Unit = {},
+    readerBgColor: String = "",
+    onSetReaderBgColor: (String) -> Unit = {},
     onPageTextCopy: () -> Unit = {},
     onBookmarkManage: () -> Unit = {},
     currentVisualOptions: com.booknext.app.ui.reader.options.VisualOptions = com.booknext.app.ui.reader.options.VisualOptions(),
@@ -137,7 +139,9 @@ fun TxtReaderScreen(
     }
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
-    val bgColor = if (darkMode) Color(0xFF1A1814) else Color(0xFFF9F7F4)
+    val bgColor = if (readerBgColor.isNotBlank()) {
+        try { Color(android.graphics.Color.parseColor(readerBgColor)) } catch (_: Exception) { if (darkMode) Color(0xFF1A1814) else Color(0xFFF9F7F4) }
+    } else if (darkMode) Color(0xFF1A1814) else Color(0xFFF9F7F4)
     var uiVisible by remember { mutableStateOf(true) }
     val tocEntries = remember(lines) {
         lines.mapIndexedNotNull { idx, line ->
@@ -412,6 +416,7 @@ fun TxtReaderScreen(
             onSetTranslateTargetLang = onSetTranslateTargetLang,
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
+            onSetReaderBgColor = onSetReaderBgColor,
         )
 
         // 搜索结果覆盖层

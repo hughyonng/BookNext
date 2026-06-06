@@ -440,6 +440,9 @@ class ReaderViewModel @Inject constructor(
         android.util.Log.d("BookNext", "setBrightness=$value")
         viewModelScope.launch { prefs.saveBrightness(value) }
     }
+    fun setBgColor(hex: String) {
+        viewModelScope.launch { prefs.saveBgColor(hex) }
+    }
     fun setNameReplacements(json: String) {
         viewModelScope.launch { prefs.saveNameReplacements(json) }
     }

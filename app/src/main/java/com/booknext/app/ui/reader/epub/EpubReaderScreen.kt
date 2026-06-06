@@ -91,6 +91,7 @@ fun EpubReaderScreen(
     onAnnotationsClick: () -> Unit = {},
     onNoteClick: () -> Unit = {},
     onTextLongPress: (String) -> Unit = {},
+    onSetReaderBgColor: (String) -> Unit = {},
     book: BookEntity? = null,
     sessions: List<ReadingSessionEntity> = emptyList(),
     coverUrl: String? = null,
@@ -103,6 +104,7 @@ fun EpubReaderScreen(
     onSaveOtherOptions: (com.booknext.app.ui.reader.options.OtherOptions) -> Unit = {},
     bookmarks: List<Int> = emptyList(),
     onAddBookmark: (Int) -> Unit = {},
+    readerBgColor: String = "",
 ) {
     var uiVisible by remember { mutableStateOf(true) }
     var totalPages by remember { mutableIntStateOf(1) }
@@ -234,6 +236,7 @@ fun EpubReaderScreen(
             onSetTranslateTargetLang = onSetTranslateTargetLang,
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
+            onSetReaderBgColor = onSetReaderBgColor,
         )
         // 搜索结果覆盖层
         if (showEpubSearchResults) {
