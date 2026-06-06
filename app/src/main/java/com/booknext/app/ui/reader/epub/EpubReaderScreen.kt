@@ -399,6 +399,7 @@ fun EpubReaderWrapper(
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
     onSelectionChanged: (String) -> Unit = {},
+    readerBgColor: String = "",
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current
@@ -458,6 +459,7 @@ fun EpubReaderWrapper(
                     onNoteClick = onNoteClick,
                     onTtsRequest = onTtsRequest,
                     onSelectionChanged = onSelectionChanged,
+                    readerBgColor = readerBgColor,
                     onError = { msg -> error = msg },
                     )
                 } catch (e: Exception) {
@@ -490,6 +492,7 @@ private suspend fun openEpubPublication(
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
     onSelectionChanged: (String) -> Unit = {},
+    readerBgColor: String = "",
     onError: (String) -> Unit,
 ) {
     val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()
@@ -532,10 +535,38 @@ private suspend fun openEpubPublication(
             "monospace" -> org.readium.r2.navigator.preferences.FontFamily.MONOSPACE
             else -> org.readium.r2.navigator.preferences.FontFamily.SERIF
         },
-        theme = if (darkMode) Theme.DARK else Theme.LIGHT,
+        theme = if (readerBgColor.isNotBlank()) {
+            // 自定义背景色：使用 CUSTOM theme
+            try {
+                val c = android.graphics.Color.parseColor(readerBgColor)
+                // 用已有 theme，不覆盖 CUSTOM（3.1.2 可能不直接支持 backgroundColor）
+                org.readium.r2.navigator.preferences.Theme.LIGHT
+            } catch (_: Exception) { Theme.LIGHT }
+        } else if (darkMode) Theme.DARK else Theme.LIGHT,
         scroll = true,
         publisherStyles = false,
     )
+    // 通过 JS 注入自定义背景色
+    if (readerBgColor.isNotBlank()) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
+            container.postDelayed({
+                fun findWebView(v: android.view.View): WebView? {
+                    if (v is WebView) return v
+                    if (v is android.view.ViewGroup) {
+                        for (i in 0 until v.childCount) {
+                            findWebView(v.getChildAt(i))?.let { return it }
+                        }
+                    }
+                    return null
+                }
+                val wv = findWebView(container) ?: return@postDelayed
+                wv.evaluateJavascript(
+                    "document.body.style.backgroundColor='$readerBgColor';",
+                    null,
+                )
+            }, 300)
+        }
+    }
 
     val locator: Locator? = publication.readingOrder
         .getOrNull(initialPage)
@@ -594,6 +625,10 @@ private suspend fun openEpubPublication(
                             return null
                         }
                         val wv = findWebView(container) ?: return@launch
+                        // 注入自定义背景色
+                        if (readerBgColor.isNotBlank()) {
+                            wv.evaluateJavascript("document.body.style.backgroundColor='$readerBgColor';", null)
+                        }
                         val q = hq.replace("'", "\\'")
                         wv.evaluateJavascript(
                             "(function(){var q='" + q + "';if(!q)return;var walk=document.createTreeWalker(document.body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}var firstMatch=null;for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(before,n);p.insertBefore(mark,n);p.insertBefore(after,n);p.removeChild(n);firstMatch=mark;}if(firstMatch)firstMatch.scrollIntoView({behavior:'auto',block:'center'});})();",
