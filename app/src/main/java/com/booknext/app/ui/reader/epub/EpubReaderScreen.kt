@@ -1,6 +1,7 @@
 package com.booknext.app.ui.reader.epub
 
 import android.os.Bundle
+import android.view.ActionMode
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.*
@@ -255,6 +256,11 @@ fun EpubReaderWrapper(
                     }
                     return super.dispatchTouchEvent(event)
                 }
+                override fun startActionModeForChild(child: android.view.View?, callback: ActionMode.Callback?): ActionMode? {
+                    android.util.Log.d("BookNext", "startActionModeForChild called, child=$child callback=$callback")
+                    // 返回 null 阻止系统工具栏
+                    return null
+                }
             }.apply { id = android.view.View.generateViewId() }
 
             scope.launch {
@@ -441,8 +447,8 @@ private suspend fun openEpubPublication(
                 return null
             }
             val wv = findWebView(container) ?: return@postDelayed
-            android.util.Log.d("BookNext", "EPUB WebView found, injecting selection bridge")
-            // 通过轮询检测选择：每 300ms 检查一次选中文本
+            android.util.Log.d("BookNext", "EPUB WebView found, class=${wv.javaClass.name}")
+            // 轮询检测选择
             val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
             var lastSel = ""
             val pollRunnable = object : Runnable {
