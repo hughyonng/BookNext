@@ -37,6 +37,9 @@ import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
 
+private var epubNavigatorRef: EpubNavigatorFragment? = null
+private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
+
 @Composable
 fun EpubReaderScreen(
     file: File,
@@ -84,20 +87,18 @@ fun EpubReaderScreen(
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    var jumpTarget by remember { mutableIntStateOf(initialPage) }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
             file = file,
             fontSize = fontSize,
             darkMode = darkMode,
-            initialPage = jumpTarget,
+            initialPage = initialPage,
             onProgressChange = onProgressChange,
             onToggleUI = { uiVisible = !uiVisible },
     onTocEntries = { tocEntries = it },
     onTotalPages = { totalPages = it },
     onChapterText = { ttsChapterText = it },
-    onJumpTo = { idx -> jumpTarget = idx },
     lineSpacing = currentVisualOptions.lineSpacing,
     fontFamilyValue = currentVisualOptions.fontFamily,
     onTextLongPress = onTextLongPress,
@@ -143,7 +144,22 @@ fun EpubReaderScreen(
                 }
             },
             onTtsStop = { epubTtsPlaying = false; stopTts() },
-            onTocJump = { idx -> jumpTarget = idx },
+            onTocJump = { idx ->
+                val nav = epubNavigatorRef
+                val pub = epubPublicationRef
+                if (nav != null && pub != null) {
+                    scope.launch(Dispatchers.Main) {
+                        val link = pub.readingOrder.getOrNull(idx)
+                        if (link != null) {
+                            val locator = Locator(
+                                href = org.readium.r2.shared.util.Url(link.href.toString())!!,
+                                mediaType = link.mediaType ?: MediaType.EPUB,
+                            )
+                            nav.go(locator, animated = false)
+                        }
+                    }
+                }
+            },
             onAddBookmark = { onAddBookmark(initialPage) },
             onSearch = { _, _ -> },
             book = book,
@@ -244,7 +260,6 @@ fun EpubReaderWrapper(
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
     onSelectionChanged: (String) -> Unit = {},
-    onJumpTo: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current
@@ -258,7 +273,6 @@ fun EpubReaderWrapper(
         return
     }
 
-    key(initialPage) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -315,7 +329,6 @@ fun EpubReaderWrapper(
             container
         }
     )
-    }
 }
 
 private suspend fun openEpubPublication(
@@ -370,6 +383,7 @@ private suspend fun openEpubPublication(
             return
         }
     )
+    epubPublicationRef = publication
 
     val prefs = EpubPreferences(
         fontSize = (fontSize / 16.0).coerceAtLeast(0.5),
@@ -456,6 +470,10 @@ private suspend fun openEpubPublication(
             .setReorderingAllowed(true)
             .replace(container.id, EpubNavigatorFragment::class.java, Bundle())
             .commitAllowingStateLoss()
+        // 保存 navigator 引用用于目录跳转
+        activity.supportFragmentManager.executePendingTransactions()
+        epubNavigatorRef = activity.supportFragmentManager
+            .findFragmentById(container.id) as? EpubNavigatorFragment
         // 找 WebView 注入文字选择检测
         container.postDelayed({
             fun findWebView(v: android.view.View): WebView? {

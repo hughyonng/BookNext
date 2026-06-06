@@ -138,9 +138,15 @@ fun TxtReaderScreen(
     val tocEntries = remember(lines) {
         lines.mapIndexedNotNull { idx, line ->
             val trimmed = line.trim()
-            if (trimmed.length in 2..30 && (trimmed.startsWith("第") || trimmed.startsWith("Chapter") || trimmed.startsWith("CHAPTER")))
-                TocEntry(title = trimmed, index = idx)
-            else null
+            val isChapter = trimmed.length in 2..40 && (
+                trimmed.startsWith("第") ||
+                trimmed.startsWith("Chapter") ||
+                trimmed.startsWith("CHAPTER") ||
+                trimmed.startsWith("chapter") ||
+                trimmed.matches(Regex("^\\d+[.、．].*")) ||
+                trimmed.matches(Regex("^[一二三四五六七八九十百]+[、.．章节].*"))
+            )
+            if (isChapter) TocEntry(title = trimmed, index = idx) else null
         }
     }
     val scope = rememberCoroutineScope()
