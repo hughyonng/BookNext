@@ -162,8 +162,8 @@ fun EpubReaderScreen(
         )
         // 浮动菜单（可拖拽）
         if (showFloatingMenu) {
-            var offsetX by remember { mutableFloatStateOf(0f) }
-            var offsetY by remember { mutableFloatStateOf(0f) }
+            var offsetX by remember { mutableFloatStateOf(40f) }
+            var offsetY by remember { mutableFloatStateOf(120f) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
