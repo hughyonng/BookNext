@@ -419,7 +419,7 @@ fun EpubReaderWrapper(
     }
 
     AndroidView(
-        modifier = modifier.statusBarsPadding().navigationBarsPadding(),
+        modifier = modifier.navigationBarsPadding(),
         factory = { ctx ->
             val container = object : FrameLayout(ctx) {
                 var downY = 0f
@@ -678,16 +678,11 @@ private suspend fun openEpubPublication(
             // 轮询检测选择
             val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
             var lastSel = ""
-            var lastBgColor = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
-                    // 背景色注入
-                    val pendingBg = epubPendingBgColor
-                    if (pendingBg != lastBgColor) {
-                        lastBgColor = pendingBg
-                        val bg = if (pendingBg.isNotBlank()) pendingBg else ""
-                        wv.evaluateJavascript("document.body.style.backgroundColor='$bg';", null)
-                    }
+                    // 背景色注入（每轮都执行，翻页后新页面自动恢复背景）
+                    val bg = epubPendingBgColor
+                    wv.evaluateJavascript("document.body.style.backgroundColor='$bg';", null)
                     // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
                         val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""

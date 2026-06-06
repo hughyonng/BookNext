@@ -198,9 +198,7 @@ fun TxtReaderScreen(
         Surface(
             color = bgColor,
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
+                .fillMaxSize(),
         ) {
             LazyColumn(
                 state = listState,
@@ -208,7 +206,7 @@ fun TxtReaderScreen(
                     .fillMaxSize()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                contentPadding = PaddingValues(bottom = 80.dp), // 底部留空，避免虚拟按键遮挡
+                contentPadding = PaddingValues(start = 0.dp, end = 0.dp, top = 4.dp, bottom = 80.dp),
             ) {
                 items(displayLines.size) { i ->
                     AndroidView(
