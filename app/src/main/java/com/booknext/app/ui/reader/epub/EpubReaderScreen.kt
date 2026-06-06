@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import java.io.File
 private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
 private var epubSearchIndex: List<Pair<Int, String>>? = null
+private var epubPendingHighlight: String = ""
 
 private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
@@ -115,6 +117,9 @@ fun EpubReaderScreen(
     var epubSearchQuery by remember { mutableStateOf("") }
     var epubSearchMatches by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
     var showEpubSearchResults by remember { mutableStateOf(false) }
+    var showEpubBackToResults by remember { mutableStateOf(false) }
+    var epubHighlightQuery by remember { mutableStateOf("") }
+    var epubHighlightChapter by remember { mutableIntStateOf(-1) }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -192,14 +197,21 @@ fun EpubReaderScreen(
             onSearch = { query, _ ->
                 if (query.isNotBlank()) {
                     epubSearchQuery = query
+                    epubHighlightQuery = query
                     val index = epubSearchIndex
                     if (index != null) {
                         epubSearchMatches = index.mapNotNull { (chIdx, text) ->
-                            if (text.contains(query, ignoreCase = true)) chIdx to text.take(200) else null
+                            if (text.contains(query, ignoreCase = true)) chIdx to text else null
                         }
                     } else {
                         epubSearchMatches = emptyList()
                     }
+                    showEpubSearchResults = true
+                    showEpubBackToResults = false
+                }
+            },
+            onSearchRequest = {
+                if (epubSearchMatches.isNotEmpty()) {
                     showEpubSearchResults = true
                 }
             },
@@ -224,30 +236,44 @@ fun EpubReaderScreen(
         )
         // 搜索结果覆盖层
         if (showEpubSearchResults) {
-            val bg = Color(0xFF1A1814)
-            val fg = Color(0xFFE0D8CC)
+            val srBg = if (darkMode) Color(0xFF1A1814) else Color(0xFFF9F7F4)
+            val srFg = if (darkMode) Color(0xFFE0D8CC) else Color(0xFF1A1A1A)
             Surface(
-                color = bg,
+                color = srBg,
                 modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
             ) {
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("搜索: $epubSearchQuery", color = fg, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        Text("共 ${epubSearchMatches.size} 个结果", color = fg.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
-                        IconButton(onClick = { showEpubSearchResults = false }) { Icon(Icons.Default.Close, "关闭", tint = fg) }
+                        Text("搜索: $epubSearchQuery", color = srFg, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        Text("共 ${epubSearchMatches.size} 个结果", color = srFg.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
+                        IconButton(onClick = { showEpubSearchResults = false; showEpubBackToResults = true }) { Icon(Icons.Default.Close, "关闭", tint = srFg) }
                     }
-                    HorizontalDivider(color = fg.copy(alpha = 0.2f))
+                    HorizontalDivider(color = srFg.copy(alpha = 0.2f))
                     if (epubSearchMatches.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("正在索引中，请稍后重试…", color = fg.copy(alpha = 0.6f))
+                            Text("正在索引中，请稍后重试…", color = srFg.copy(alpha = 0.6f))
                         }
                     } else {
                         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
                             items(epubSearchMatches.size) { idx ->
-                                val (chIdx, text) = epubSearchMatches[idx]
+                                val (chIdx, fullText) = epubSearchMatches[idx]
+                                // 找到匹配位置周围的一段文字
+                                val lower = fullText.lowercase()
+                                val ql = epubSearchQuery.lowercase()
+                                val matchPos = lower.indexOf(ql)
+                                val displayText = if (matchPos >= 0) {
+                                    val start = (matchPos - 40).coerceAtLeast(0)
+                                    val end = (matchPos + ql.length + 40).coerceAtMost(fullText.length)
+                                    val prefix = if (start > 0) "…" else ""
+                                    val suffix = if (end < fullText.length) "…" else ""
+                                    prefix + fullText.substring(start, end).trim() + suffix
+                                } else fullText.take(150)
                                 TextButton(onClick = {
                                     scope.launch {
                                         showEpubSearchResults = false
+                                        epubHighlightChapter = chIdx
+                                        epubPendingHighlight = epubSearchQuery
+                                        showEpubBackToResults = true
                                         val nav = epubNavigatorRef
                                         val pubRef = epubPublicationRef
                                         if (nav != null && pubRef != null) {
@@ -260,15 +286,24 @@ fun EpubReaderScreen(
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Column(Modifier.fillMaxWidth()) {
                                         Text("第 ${chIdx + 1} 章", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                                        val display = text.take(150).trim()
-                                        Text(buildEpubSpannable(display, epubSearchQuery), style = MaterialTheme.typography.bodyMedium, color = fg, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                        Text(buildEpubSpannable(displayText, epubSearchQuery), style = MaterialTheme.typography.bodyMedium, color = srFg, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                     }
                                 }
-                                if (idx < epubSearchMatches.size - 1) HorizontalDivider(color = fg.copy(alpha = 0.1f))
+                                if (idx < epubSearchMatches.size - 1) HorizontalDivider(color = srFg.copy(alpha = 0.1f))
                             }
                         }
                     }
                 }
+            }
+        }
+        // 返回搜索结果 FAB
+        if (showEpubBackToResults) {
+            FloatingActionButton(
+                onClick = { showEpubBackToResults = false; showEpubSearchResults = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 100.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Icon(Icons.Default.Search, "返回搜索结果", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
         // 浮动菜单（可拖拽）
@@ -601,8 +636,21 @@ private suspend fun openEpubPublication(
             // 轮询检测选择
             val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
             var lastSel = ""
+            var lastHighlighted = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
+                    // 搜索高亮注入（导航到新章节后执行）
+                    val pending = epubPendingHighlight
+                    if (pending.isNotEmpty() && pending != lastHighlighted) {
+                        lastHighlighted = pending
+                        epubPendingHighlight = ""
+                        val q = pending.replace("'", "\\'")
+                        wv.evaluateJavascript(
+                            "(function(){var q='" + q + "';if(!q)return;var body=document.body;var walk=document.createTreeWalker(body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(after,n);p.insertBefore(mark,n);p.insertBefore(before,n);p.removeChild(n);}})();",
+                            null,
+                        )
+                    }
+                    // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
                         val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
                         if (text != lastSel) {
