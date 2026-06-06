@@ -134,13 +134,14 @@ fun ReaderToolbarOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     Text(
                         text = state.title,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     )
                     Text(
@@ -151,7 +152,7 @@ fun ReaderToolbarOverlay(
                     )
                     Box {
                         IconButton(onClick = { showMoreActions = !showMoreActions }) {
-                            Icon(Icons.Default.MoreVert, "更多")
+                            Icon(Icons.Default.MoreVert, "更多", tint = MaterialTheme.colorScheme.onSurface)
                         }
                         DropdownMenu(
                             expanded = showMoreActions,
@@ -211,7 +212,7 @@ fun ReaderToolbarOverlay(
                         Text(
                             "${state.currentPage + 1}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Slider(
                             value = state.currentPage.toFloat(),
@@ -222,7 +223,7 @@ fun ReaderToolbarOverlay(
                         Text(
                             "${state.totalPages}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
 
@@ -269,7 +270,7 @@ fun ReaderToolbarOverlay(
                             icon = Icons.Default.RecordVoiceOver,
                             label = "朗读",
                             tint = if (state.isTtsPlaying) MaterialTheme.colorScheme.primary
-                                   else LocalContentColor.current,
+                                   else MaterialTheme.colorScheme.onSurface,
                             onClick = {
                                 if (state.isTtsPlaying) {
                                     showTtsPanel = !showTtsPanel
@@ -374,7 +375,7 @@ private fun ToolbarIconButton(
     label: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    tint: Color = LocalContentColor.current,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
