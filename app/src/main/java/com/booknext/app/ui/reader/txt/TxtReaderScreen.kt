@@ -2,6 +2,7 @@ package com.booknext.app.ui.reader.txt
 
 import android.text.SpannableString
 import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
@@ -172,6 +173,9 @@ fun TxtReaderScreen(
     var searchMatches by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     var showBackToResults by remember { mutableStateOf(false) }
+    // 当前页高亮标记（搜索结果跳转后使用）
+    var highlightLine by remember { mutableIntStateOf(-1) }
+    var highlightQuery by remember { mutableStateOf("") }
 
     fun pageSize(): Int {
         val visible = listState.layoutInfo.visibleItemsInfo
@@ -314,6 +318,21 @@ fun TxtReaderScreen(
                             } else {
                                 tv.text = lineText
                             }
+                            // 搜索关键词高亮
+                            if (highlightQuery.isNotBlank() && i == highlightLine) {
+                                val ss = if (tv.text is SpannableString) SpannableString(tv.text) else SpannableString(lineText)
+                                var pos = 0
+                                val lower = lineText.lowercase()
+                                val qLower = highlightQuery.lowercase()
+                                while (true) {
+                                    val idx = lower.indexOf(qLower, pos)
+                                    if (idx < 0) break
+                                    ss.setSpan(BackgroundColorSpan(android.graphics.Color.parseColor("#FFEB3B")), idx, idx + qLower.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                                    ss.setSpan(ForegroundColorSpan(android.graphics.Color.RED), idx, idx + qLower.length, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
+                                    pos = idx + qLower.length
+                                }
+                                tv.text = ss
+                            }
                             tv.textSize = currentFontSize.toFloat()
                             tv.setTextColor(textColor)
                             tv.setLineSpacing(0f, lineSpacing)
@@ -354,11 +373,18 @@ fun TxtReaderScreen(
             onSearch = { query, _ ->
                 if (query.isNotBlank()) {
                     searchQuery = query
+                    highlightQuery = query
                     searchMatches = displayLines.mapIndexedNotNull { i, line ->
                         if (line.contains(query, ignoreCase = true)) i to line else null
                     }
                     showSearchResults = true
                     showBackToResults = false
+                }
+            },
+            onSearchRequest = {
+                // 已有搜索结果时直接打开结果页
+                if (searchMatches.isNotEmpty()) {
+                    showSearchResults = true
                 }
             },
             onReplaceAll = { from, to ->
@@ -431,6 +457,7 @@ fun TxtReaderScreen(
                             TextButton(
                                 onClick = {
                                     scope.launch {
+                                        highlightLine = line
                                         listState.animateScrollToItem(line.coerceAtMost(displayLines.size - 1))
                                         showSearchResults = false
                                         showBackToResults = true

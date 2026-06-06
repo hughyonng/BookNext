@@ -69,6 +69,7 @@ fun ReaderToolbarOverlay(
     onAddBookmark: () -> Unit,
     onAutoScroll: (mode: String, speed: Float) -> Unit = { _, _ -> },
     onSearch: (query: String, nthMatch: Int) -> Unit = { _, _ -> },
+    onSearchRequest: () -> Unit = {},
     onReplaceAll: (from: String, to: String) -> Unit = { _, _ -> },
     book: BookEntity? = null,
     sessions: List<ReadingSessionEntity> = emptyList(),
@@ -172,7 +173,7 @@ fun ReaderToolbarOverlay(
                                             "Font" -> showVisualOptions = true
                                             "Toc" -> showToc = true
                                             "Bookmarks" -> showBookmarks = true
-                                            "Search" -> showSearchBar = true
+                                            "Search" -> { showSearchBar = true; onSearchRequest() }
                                             "Dictionary" -> onDictionaryLookup()
                                             "TranslateSettings" -> showTranslateSettings = true
                                         }
