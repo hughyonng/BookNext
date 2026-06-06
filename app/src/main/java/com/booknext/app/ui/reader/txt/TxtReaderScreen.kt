@@ -11,6 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -163,6 +166,12 @@ fun TxtReaderScreen(
     var translatedText by remember { mutableStateOf<String?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
     var translateError by remember { mutableStateOf<String?>(null) }
+
+    // 搜索状态
+    var searchQuery by remember { mutableStateOf("") }
+    var searchMatches by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
+    var showSearchResults by remember { mutableStateOf(false) }
+    var showBackToResults by remember { mutableStateOf(false) }
 
     fun pageSize(): Int {
         val visible = listState.layoutInfo.visibleItemsInfo
@@ -342,12 +351,14 @@ fun TxtReaderScreen(
             onTtsStop = onTtsStop,
             onTocJump = { idx -> scope.launch { listState.animateScrollToItem(idx) } },
             onAddBookmark = { onAddBookmark(listState.firstVisibleItemIndex) },
-            onSearch = { query, nthMatch ->
-                scope.launch {
-                    if (query.isBlank()) return@launch
-                    val matches = displayLines.mapIndexedNotNull { i, line -> if (line.contains(query, ignoreCase = true)) i else null }
-                    val idx = matches.getOrNull(nthMatch.coerceIn(0, matches.lastIndex))
-                    if (idx != null) listState.animateScrollToItem(idx)
+            onSearch = { query, _ ->
+                if (query.isNotBlank()) {
+                    searchQuery = query
+                    searchMatches = displayLines.mapIndexedNotNull { i, line ->
+                        if (line.contains(query, ignoreCase = true)) i to line else null
+                    }
+                    showSearchResults = true
+                    showBackToResults = false
                 }
             },
             onReplaceAll = { from, to ->
@@ -377,6 +388,97 @@ fun TxtReaderScreen(
             onDictionaryLookup = onDictionaryLookup,
         )
 
+        // 搜索结果覆盖层
+        if (showSearchResults) {
+            val bg = if (darkMode) Color(0xFF1A1814) else Color(0xFFF9F7F4)
+            val fg = if (darkMode) Color(0xFFE0D8CC) else Color(0xFF1A1A1A)
+            Surface(
+                color = bg,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    // 顶部标题栏
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "搜索：${searchQuery}",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = fg,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            "共 ${searchMatches.size} 个结果",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = fg.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                        IconButton(onClick = { showSearchResults = false }) {
+                                Icon(Icons.Default.Close, "关闭", tint = fg)
+                            }
+                    }
+                    HorizontalDivider(color = fg.copy(alpha = 0.2f))
+                    // 结果列表
+                    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                        items(searchMatches.size) { idx ->
+                            val (line, text) = searchMatches[idx]
+                            val displayText = text.trim()
+                            val spannable = buildSpannableString(displayText, searchQuery)
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        listState.animateScrollToItem(line.coerceAtMost(displayLines.size - 1))
+                                        showSearchResults = false
+                                        showBackToResults = true
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        "${line + 1}.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text(
+                                        spannable,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = fg,
+                                        maxLines = 3,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            if (idx < searchMatches.size - 1) {
+                                HorizontalDivider(color = fg.copy(alpha = 0.1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 返回搜索结果 FAB
+        if (showBackToResults) {
+            FloatingActionButton(
+                onClick = { showBackToResults = false; showSearchResults = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp, bottom = 100.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    "返回搜索结果",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+
         if (showTranslation) {
             TranslationDialog(
                 originalText = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: "",
@@ -389,4 +491,22 @@ fun TxtReaderScreen(
             )
         }
     }
+}
+
+private fun buildSpannableString(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
+    val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
+    if (query.isBlank()) return builder.toAnnotatedString()
+    var start = 0
+    val lower = text.lowercase()
+    val qLower = query.lowercase()
+    while (true) {
+        val idx = lower.indexOf(qLower, start)
+        if (idx < 0) break
+        builder.addStyle(
+            androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color.Red),
+            idx, idx + qLower.length,
+        )
+        start = idx + qLower.length
+    }
+    return builder.toAnnotatedString()
 }

@@ -673,7 +673,7 @@ private fun FindReplaceDialog(
             Spacer(Modifier.height(16.dp))
 
             Button(
-                onClick = { nthMatch = 0; searched = true; onSearch(findText, 0) },
+                onClick = { nthMatch = 0; searched = true; onSearch(findText, 0); onDismiss() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = findText.isNotBlank(),
             ) { Text("搜索") }
