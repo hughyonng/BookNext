@@ -811,12 +811,12 @@ fun applyBrightness(activity: Activity?, value: Float) {
 
 private data class BgColorOption(val label: String, val colorHex: String)
 private val BG_COLORS = listOf(
-    BgColorOption("默认白", "#FFF9F7F4"),
-    BgColorOption("护眼绿", "#FFC7EDCC"),
-    BgColorOption("羊皮纸", "#FFF5F0E8"),
-    BgColorOption("浅灰", "#FFE8E8E8"),
-    BgColorOption("豆沙绿", "#FFB7C9B7"),
-    BgColorOption("深色", "#FF1A1814"),
+    BgColorOption("默认白", "#F9F7F4"),
+    BgColorOption("护眼绿", "#C7EDCC"),
+    BgColorOption("羊皮纸", "#F5F0E8"),
+    BgColorOption("浅灰", "#E8E8E8"),
+    BgColorOption("豆沙绿", "#B7C9B7"),
+    BgColorOption("深色", "#1A1814"),
 )
 
 @Composable

@@ -185,6 +185,7 @@ fun ReaderScreen(
                                 selectedLocator = "epub_sel"
                             },
                             onSetReaderBgColor = { viewModel.setBgColor(it) },
+                            readerBgColor = readerBgColor,
                         )
                         "txt", "mobi", "azw3" -> TxtReaderScreen(
                             file = s.file,

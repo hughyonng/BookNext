@@ -50,6 +50,7 @@ private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
 private var epubSearchIndex: List<Pair<Int, String>>? = null
 private var epubPendingHighlight: String = ""
+private var epubPendingBgColor: String = ""
 
 private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
@@ -123,6 +124,10 @@ fun EpubReaderScreen(
     var showEpubBackToResults by remember { mutableStateOf(false) }
     var epubHighlightQuery by remember { mutableStateOf("") }
     var epubHighlightChapter by remember { mutableIntStateOf(-1) }
+    // 监听背景色变化，触发轮询线程 JS 注入
+    LaunchedEffect(readerBgColor) {
+        epubPendingBgColor = readerBgColor
+    }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -535,38 +540,10 @@ private suspend fun openEpubPublication(
             "monospace" -> org.readium.r2.navigator.preferences.FontFamily.MONOSPACE
             else -> org.readium.r2.navigator.preferences.FontFamily.SERIF
         },
-        theme = if (readerBgColor.isNotBlank()) {
-            // 自定义背景色：使用 CUSTOM theme
-            try {
-                val c = android.graphics.Color.parseColor(readerBgColor)
-                // 用已有 theme，不覆盖 CUSTOM（3.1.2 可能不直接支持 backgroundColor）
-                org.readium.r2.navigator.preferences.Theme.LIGHT
-            } catch (_: Exception) { Theme.LIGHT }
-        } else if (darkMode) Theme.DARK else Theme.LIGHT,
+        theme = if (readerBgColor.isNotBlank() && readerBgColor != "#1A1814") Theme.LIGHT else if (darkMode) Theme.DARK else Theme.LIGHT,
         scroll = true,
         publisherStyles = false,
     )
-    // 通过 JS 注入自定义背景色
-    if (readerBgColor.isNotBlank()) {
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
-            container.postDelayed({
-                fun findWebView(v: android.view.View): WebView? {
-                    if (v is WebView) return v
-                    if (v is android.view.ViewGroup) {
-                        for (i in 0 until v.childCount) {
-                            findWebView(v.getChildAt(i))?.let { return it }
-                        }
-                    }
-                    return null
-                }
-                val wv = findWebView(container) ?: return@postDelayed
-                wv.evaluateJavascript(
-                    "document.body.style.backgroundColor='$readerBgColor';",
-                    null,
-                )
-            }, 300)
-        }
-    }
 
     val locator: Locator? = publication.readingOrder
         .getOrNull(initialPage)
@@ -625,10 +602,6 @@ private suspend fun openEpubPublication(
                             return null
                         }
                         val wv = findWebView(container) ?: return@launch
-                        // 注入自定义背景色
-                        if (readerBgColor.isNotBlank()) {
-                            wv.evaluateJavascript("document.body.style.backgroundColor='$readerBgColor';", null)
-                        }
                         val q = hq.replace("'", "\\'")
                         wv.evaluateJavascript(
                             "(function(){var q='" + q + "';if(!q)return;var walk=document.createTreeWalker(document.body,4,null,false);var nodes=[];while(walk.nextNode()){var n=walk.currentNode;if(n.nodeValue.toLowerCase().indexOf(q.toLowerCase())>=0)nodes.push(n);}var firstMatch=null;for(var i=nodes.length-1;i>=0;i--){var n=nodes[i];var p=n.parentNode;var t=n.nodeValue;var idx=t.toLowerCase().indexOf(q.toLowerCase());if(idx<0)continue;var before=document.createTextNode(t.substring(0,idx));var mark=document.createElement('span');mark.style.background='#FFEB3B';mark.style.color='red';mark.textContent=t.substring(idx,idx+q.length);var after=document.createTextNode(t.substring(idx+q.length));p.insertBefore(before,n);p.insertBefore(mark,n);p.insertBefore(after,n);p.removeChild(n);firstMatch=mark;}if(firstMatch)firstMatch.scrollIntoView({behavior:'auto',block:'center'});})();",
@@ -705,8 +678,16 @@ private suspend fun openEpubPublication(
             // 轮询检测选择
             val pollHandler = android.os.Handler(android.os.Looper.getMainLooper())
             var lastSel = ""
+            var lastBgColor = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
+                    // 背景色注入
+                    val pendingBg = epubPendingBgColor
+                    if (pendingBg != lastBgColor) {
+                        lastBgColor = pendingBg
+                        val bg = if (pendingBg.isNotBlank()) pendingBg else ""
+                        wv.evaluateJavascript("document.body.style.backgroundColor='$bg';", null)
+                    }
                     // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
                         val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
