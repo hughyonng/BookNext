@@ -84,10 +84,9 @@ fun EpubReaderScreen(
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    var jumpCount by remember { mutableIntStateOf(0) }
     var jumpTarget by remember { mutableIntStateOf(initialPage) }
     Box(Modifier.fillMaxSize()) {
-        key(darkMode, fontSize, jumpCount) {
+        key(darkMode, fontSize) {
         EpubReaderWrapper(
             file = file,
             fontSize = fontSize,
@@ -98,6 +97,7 @@ fun EpubReaderScreen(
     onTocEntries = { tocEntries = it },
     onTotalPages = { totalPages = it },
     onChapterText = { ttsChapterText = it },
+    onJumpTo = { idx -> jumpTarget = idx },
     lineSpacing = currentVisualOptions.lineSpacing,
     fontFamilyValue = currentVisualOptions.fontFamily,
     onTextLongPress = onTextLongPress,
@@ -143,7 +143,7 @@ fun EpubReaderScreen(
                 }
             },
             onTtsStop = { epubTtsPlaying = false; stopTts() },
-            onTocJump = { idx -> jumpTarget = idx; jumpCount++ },
+            onTocJump = { idx -> jumpTarget = idx },
             onAddBookmark = { onAddBookmark(initialPage) },
             onSearch = { _, _ -> },
             book = book,
@@ -244,6 +244,7 @@ fun EpubReaderWrapper(
     onNoteClick: () -> Unit = {},
     onTtsRequest: (String) -> Unit = {},
     onSelectionChanged: (String) -> Unit = {},
+    onJumpTo: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current
@@ -257,6 +258,7 @@ fun EpubReaderWrapper(
         return
     }
 
+    key(initialPage) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -313,6 +315,7 @@ fun EpubReaderWrapper(
             container
         }
     )
+    }
 }
 
 private suspend fun openEpubPublication(
