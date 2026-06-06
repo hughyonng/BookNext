@@ -1,15 +1,18 @@
 package com.booknext.app.ui.reader.epub
 
 import android.os.Bundle
-import android.view.ActionMode
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
@@ -80,6 +83,7 @@ fun EpubReaderScreen(
     // 浮层按钮状态
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
         EpubReaderWrapper(
@@ -156,17 +160,34 @@ fun EpubReaderScreen(
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
         )
-        // 浮动菜单
+        // 浮动菜单（可拖拽）
         if (showFloatingMenu) {
-            Column(
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            var offsetX by remember { mutableFloatStateOf(0f) }
+            var offsetY by remember { mutableFloatStateOf(0f) }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures { pos ->
+                            // 点击空白区域关闭菜单
+                            showFloatingMenu = false
+                        }
+                    }
             ) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    shadowElevation = 6.dp,
+                    shape = RoundedCornerShape(10.dp),
+                    shadowElevation = 8.dp,
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 3.dp,
+                    modifier = Modifier
+                        .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                offsetX += dragAmount.x
+                                offsetY += dragAmount.y
+                            }
+                        },
                 ) {
                     Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         TextButton(onClick = {
@@ -255,11 +276,6 @@ fun EpubReaderWrapper(
                         }
                     }
                     return super.dispatchTouchEvent(event)
-                }
-                override fun startActionModeForChild(child: android.view.View?, callback: ActionMode.Callback?): ActionMode? {
-                    android.util.Log.d("BookNext", "startActionModeForChild called, child=$child callback=$callback")
-                    // 返回 null 阻止系统工具栏
-                    return null
                 }
             }.apply { id = android.view.View.generateViewId() }
 
