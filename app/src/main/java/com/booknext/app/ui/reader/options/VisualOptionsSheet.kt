@@ -1,23 +1,33 @@
 package com.booknext.app.ui.reader.options
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 data class VisualOptions(
     val fontSize: Int = 17,
     val lineSpacing: Float = 1.8f,
     val fontFamily: String = "serif",
+    val customFontPath: String = "",
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -26,8 +36,34 @@ fun VisualOptionsSheet(
     options: VisualOptions,
     onOptionsChange: (VisualOptions) -> Unit,
     onDismiss: () -> Unit,
+    onUploadCustomFont: (Uri) -> Unit = {},
 ) {
     var opt by remember { mutableStateOf(options) }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val fontPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val fileName = "custom_${System.currentTimeMillis()}.ttf"
+                val targetDir = File(ctx.filesDir, "fonts")
+                targetDir.mkdirs()
+                val targetFile = File(targetDir, fileName)
+                withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openInputStream(uri)?.use { input ->
+                        targetFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+                val fontPath = targetFile.absolutePath
+                opt = opt.copy(fontFamily = "custom", customFontPath = fontPath)
+                onOptionsChange(opt.copy(fontFamily = "custom", customFontPath = fontPath))
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -92,6 +128,28 @@ fun VisualOptionsSheet(
                         onClick = { opt = opt.copy(fontFamily = key) },
                         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                     )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { fontPicker.launch("*/*") },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (opt.fontFamily == "custom") "已上传字体" else "上传自定义字体",
+                        style = MaterialTheme.typography.labelSmall)
+                }
+                if (opt.fontFamily == "custom") {
+                    TextButton(onClick = {
+                        opt = opt.copy(fontFamily = "serif", customFontPath = "")
+                        onOptionsChange(opt.copy(fontFamily = "serif", customFontPath = ""))
+                    }) { Text("恢复默认", style = MaterialTheme.typography.labelSmall) }
                 }
             }
 

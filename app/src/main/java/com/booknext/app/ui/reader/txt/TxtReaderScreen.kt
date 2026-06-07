@@ -351,7 +351,15 @@ fun TxtReaderScreen(
                             tv.textSize = currentFontSize.toFloat()
                             tv.setTextColor(textColor)
                             tv.setLineSpacing(0f, lineSpacing)
-                            try { tv.typeface = android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL) } catch (_: Exception) {}
+                            // 应用字体
+                            if (fontFamily == "custom" && currentVisualOptions.customFontPath.isNotEmpty()) {
+                                try {
+                                    val tf = android.graphics.Typeface.createFromFile(currentVisualOptions.customFontPath)
+                                    tv.typeface = tf
+                                } catch (_: Exception) {}
+                            } else {
+                                try { tv.typeface = android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL) } catch (_: Exception) {}
+                            }
                             tv.tag = i
                         },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),

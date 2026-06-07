@@ -109,6 +109,8 @@ class ReaderViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
     val pageAnimation: StateFlow<String> = prefs.pageAnimation
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "none")
+    val customFontPath: StateFlow<String> = prefs.customFontPath
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     // ── 控制选项 StateFlow ─────────────────────────────
     val tapLeftAction: StateFlow<String> = prefs.tapLeftAction
@@ -187,13 +189,14 @@ class ReaderViewModel @Inject constructor(
     // ── 合并选项 StateFlow ────────────────────────────
     val visualOptions: StateFlow<VisualOptions> = combine(
         listOf<Flow<*>>(
-            fontSize, lineSpacing, fontFamily,
+            fontSize, lineSpacing, fontFamily, customFontPath,
         )
     ) { arr ->
         VisualOptions(
             fontSize = arr[0] as Int,
             lineSpacing = arr[1] as Float,
             fontFamily = arr[2] as String,
+            customFontPath = arr[3] as String,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), VisualOptions())
     val controlOptions: StateFlow<ControlOptions> = combine(
@@ -465,6 +468,7 @@ class ReaderViewModel @Inject constructor(
                 fontSize = opt.fontSize, lineSpacing = opt.lineSpacing,
                 fontFamily = opt.fontFamily,
             )
+            prefs.saveCustomFontPath(opt.customFontPath)
         }
     }
     fun saveControlOptions(opt: com.booknext.app.ui.reader.options.ControlOptions) {
