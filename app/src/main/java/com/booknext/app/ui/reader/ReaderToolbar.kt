@@ -816,8 +816,13 @@ private val BG_COLORS = listOf(
     BgColorOption("羊皮纸", "#F5F0E8"),
     BgColorOption("浅灰", "#E8E8E8"),
     BgColorOption("豆沙绿", "#B7C9B7"),
-    BgColorOption("深色", "#1A1814"),
+    BgColorOption("杏仁", "#F7EED3"),
+    BgColorOption("暗灰", "#3A3A3A"),
+    BgColorOption("深褐", "#2C2416"),
+    BgColorOption("墨绿黑", "#1E2A1E"),
 )
+
+private const val BG_COLUMNS = 3
 
 @Composable
 private fun BgColorDialog(
@@ -830,20 +835,23 @@ private fun BgColorDialog(
         title = { Text("阅读背景", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    BG_COLORS.take(3).forEach { opt ->
-                        BgColorCircle(opt, onSelect)
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    BG_COLORS.drop(3).forEach { opt ->
-                        BgColorCircle(opt, onSelect)
+                if (BG_COLORS.isEmpty()) {
+                    Text("无可用背景", modifier = Modifier.padding(16.dp))
+                } else {
+                    val rows = BG_COLORS.chunked(BG_COLUMNS)
+                    rows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                        ) {
+                            row.forEach { opt ->
+                                BgColorCircle(opt, onSelect, Modifier.weight(1f))
+                            }
+                            // 补齐空位保持对齐
+                            repeat(BG_COLUMNS - row.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
                 TextButton(onClick = onReset, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -859,8 +867,8 @@ private fun BgColorDialog(
 }
 
 @Composable
-private fun BgColorCircle(opt: BgColorOption, onSelect: (String) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(70.dp)) {
+private fun BgColorCircle(opt: BgColorOption, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Box(
             modifier = Modifier
                 .size(52.dp)
