@@ -1,7 +1,5 @@
 package com.booknext.app.ui.settings
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -16,12 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -93,39 +89,25 @@ fun SettingsScreen(
                 }
             }
 
-            SectionTitle("阅读设置")
+            SectionTitle("界面字体")
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("夜间模式", style = MaterialTheme.typography.bodyLarge)
-                    Text("深色背景护眼", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = state.darkMode,
-                    onCheckedChange = viewModel::onDarkModeChange,
-                )
-            }
-
+            // UI 字体缩放
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("正文字号", style = MaterialTheme.typography.bodyLarge)
-                    Text("${state.fontSize} sp", style = MaterialTheme.typography.bodyMedium,
+                    Text("字大小", style = MaterialTheme.typography.bodyLarge)
+                    Text("${String.format("%.1f", state.uiFontScale)}x",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Slider(
-                    value = state.fontSize.toFloat(),
-                    onValueChange = { viewModel.onFontSizeChange(it.toInt()) },
-                    valueRange = 13f..24f,
-                    steps = 10,
+                    value = state.uiFontScale,
+                    onValueChange = { viewModel.onUiFontScaleChange(it) },
+                    valueRange = 0.8f..1.5f,
+                    steps = 6,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(
@@ -139,97 +121,64 @@ fun SettingsScreen(
                 }
             }
 
-            // 字体家族
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("字体", style = MaterialTheme.typography.bodyLarge)
-                var expanded by remember { mutableStateOf(false) }
-                val fonts = listOf(
-                    "serif" to "衬线（宋体）",
-                    "sans-serif" to "无衬线（黑体）",
-                    "monospace" to "等宽",
-                    "custom" to "自定义字体…",
-                )
-                val fontPicker = rememberLauncherForActivityResult(OpenDocument()) { uri ->
-                    if (uri != null) viewModel.onCustomFontPicked(uri)
-                }
-                Box {
-                    TextButton(onClick = { expanded = true }) {
-                        Text(fonts.find { it.first == state.fontFamily }?.second ?: "衬线（宋体）")
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        fonts.forEach { (key, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    if (key == "custom") {
-                                        expanded = false
-                                        fontPicker.launch(arrayOf("font/ttf", "font/otf", "*/*"))
-                                    } else {
-                                        viewModel.onFontFamilyChange(key)
-                                        expanded = false
-                                    }
-                                }
-                            )
-                        }
-                    }
+            // UI 字体
+            Text("字体", style = MaterialTheme.typography.bodyLarge)
+            val uiFonts = listOf(
+                "sans-serif" to "无衬线",
+                "serif" to "衬线",
+                "monospace" to "等宽",
+                "cursive" to "手写体",
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                uiFonts.forEach { (key, label) ->
+                    FilterChip(
+                        selected = state.uiFontFamily == key,
+                        onClick = { viewModel.onUiFontFamilyChange(key) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    )
                 }
             }
 
-            if (state.fontFamily == "custom" && state.customFontName.isNotEmpty()) {
-                Text(
-                    "已选：${state.customFontName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                )
-            }
-
-            // 行间距
+            // UI 行间距
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("行间距", style = MaterialTheme.typography.bodyLarge)
-                    Text("${java.lang.String.format("%.1f", state.lineSpacing)}x",
+                    Text("${String.format("%.1f", state.uiLineSpacing)}x",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Slider(
-                    value = state.lineSpacing,
-                    onValueChange = { viewModel.onLineSpacingChange(it) },
-                    valueRange = 1.2f..2.8f,
+                    value = state.uiLineSpacing,
+                    onValueChange = { viewModel.onUiLineSpacingChange(it) },
+                    valueRange = 1.0f..2.5f,
+                    steps = 5,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Text(
-                    text = "这是正文预览。书中自有黄金屋，书中自有颜如玉。",
-                    fontSize = TextUnit(state.fontSize.toFloat(), TextUnitType.Sp),
-                    lineHeight = TextUnit(state.fontSize * 1.8f, TextUnitType.Sp),
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
-
-            Button(
-                onClick = { viewModel.save() },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-            ) {
-                Text(if (state.saved) "✓ 已保存" else "保存设置")
-            }
-
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            SectionTitle("护眼模式")
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("护眼模式", style = MaterialTheme.typography.bodyLarge)
+                    Text("减少蓝光，降低亮度", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = state.darkMode,
+                    onCheckedChange = viewModel::onDarkModeChange,
+                )
+            }
 
             SectionTitle("账号")
 

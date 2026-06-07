@@ -47,6 +47,9 @@ class MainActivity : FragmentActivity() {
         setContent {
             val themeId by prefs.themeId.collectAsState(initial = "blue")
             val darkMode by prefs.darkMode.collectAsState(initial = false)
+            val uiFontScale by prefs.uiFontScale.collectAsState(initial = 1.0f)
+            val uiFontFamily by prefs.uiFontFamily.collectAsState(initial = "sans-serif")
+            val uiLineSpacing by prefs.uiLineSpacing.collectAsState(initial = 1.5f)
             val serverUrl by prefs.serverUrl.collectAsState(initial = "")
             val scope = rememberCoroutineScope()
 
@@ -63,7 +66,13 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            BookNextTheme(themeId = themeId, darkTheme = darkMode) {
+            BookNextTheme(
+                themeId = themeId,
+                darkTheme = darkMode,
+                uiFontScale = uiFontScale,
+                uiFontFamily = uiFontFamily,
+                uiLineSpacing = uiLineSpacing,
+            ) {
                 CompositionLocalProvider(LocalActivity provides this@MainActivity) {
                     when (appState) {
                         AppState.WELCOME -> com.booknext.app.ui.welcome.WelcomeScreen(

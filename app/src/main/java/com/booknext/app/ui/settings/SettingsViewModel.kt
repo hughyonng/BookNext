@@ -18,12 +18,10 @@ data class SettingsState(
     val serverUrl: String = "",
     val apiKey: String = "",
     val darkMode: Boolean = false,
-    val fontSize: Int = 17,
-    val fontFamily: String = "serif",
-    val lineSpacing: Float = 1.8f,
-    val customFontName: String = "",
+    val uiFontScale: Float = 1.0f,
+    val uiFontFamily: String = "sans-serif",
+    val uiLineSpacing: Float = 1.5f,
     val themeId: String = "blue",
-    val saved: Boolean = false,
     val cacheSize: String = "",
 )
 
@@ -42,13 +40,9 @@ class SettingsViewModel @Inject constructor(
                 serverUrl = prefs.serverUrl.first(),
                 apiKey = prefs.apiKey.first(),
                 darkMode = prefs.darkMode.first(),
-                fontSize = prefs.fontSize.first(),
-                fontFamily = prefs.fontFamily.first(),
-                lineSpacing = prefs.lineSpacing.first(),
-                customFontName = run {
-                    val path = prefs.customFontPath.first()
-                    if (path.isEmpty()) "" else path.substringAfterLast("/").substringAfterLast("%2F")
-                },
+                uiFontScale = prefs.uiFontScale.first(),
+                uiFontFamily = prefs.uiFontFamily.first(),
+                uiLineSpacing = prefs.uiLineSpacing.first(),
                 themeId = prefs.themeId.first(),
             )
             refreshCacheSize()
@@ -81,35 +75,27 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v, saved = false) }
-    fun onKeyChange(v: String) { _state.value = _state.value.copy(apiKey = v, saved = false) }
-    fun onDarkModeChange(v: Boolean) { _state.value = _state.value.copy(darkMode = v, saved = false) }
-    fun onFontSizeChange(v: Int) { _state.value = _state.value.copy(fontSize = v, saved = false) }
-    fun onFontFamilyChange(v: String) { _state.value = _state.value.copy(fontFamily = v, saved = false) }
-    fun onLineSpacingChange(v: Float) { _state.value = _state.value.copy(lineSpacing = v, saved = false) }
-    fun onThemeChange(id: String) {
-        _state.value = _state.value.copy(themeId = id, saved = false)
-        viewModelScope.launch { prefs.saveThemeId(id) }
+    fun onUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v) }
+    fun onKeyChange(v: String) { _state.value = _state.value.copy(apiKey = v) }
+    fun onDarkModeChange(v: Boolean) {
+        _state.value = _state.value.copy(darkMode = v)
+        viewModelScope.launch { prefs.saveDarkMode(v) }
     }
-    fun onCustomFontPicked(uri: android.net.Uri) {
-        viewModelScope.launch {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-            val path = uri.toString()
-            prefs.saveCustomFontPath(path)
-            prefs.saveFontFamily("custom")
-            val name = uri.lastPathSegment
-                ?.substringAfterLast("/")
-                ?.substringAfterLast("%2F")
-                ?: "自定义字体"
-            _state.value = _state.value.copy(
-                fontFamily = "custom",
-                customFontName = name,
-                saved = false,
-            )
-        }
+    fun onUiFontScaleChange(v: Float) {
+        _state.value = _state.value.copy(uiFontScale = v)
+        viewModelScope.launch { prefs.saveUiFontScale(v) }
+    }
+    fun onUiFontFamilyChange(v: String) {
+        _state.value = _state.value.copy(uiFontFamily = v)
+        viewModelScope.launch { prefs.saveUiFontFamily(v) }
+    }
+    fun onUiLineSpacingChange(v: Float) {
+        _state.value = _state.value.copy(uiLineSpacing = v)
+        viewModelScope.launch { prefs.saveUiLineSpacing(v) }
+    }
+    fun onThemeChange(id: String) {
+        _state.value = _state.value.copy(themeId = id)
+        viewModelScope.launch { prefs.saveThemeId(id) }
     }
 
     fun save() {
@@ -117,11 +103,7 @@ class SettingsViewModel @Inject constructor(
             val s = _state.value
             prefs.saveCredentials(s.serverUrl.trimEnd('/'), s.apiKey.trim())
             prefs.saveDarkMode(s.darkMode)
-            prefs.saveFontSize(s.fontSize)
-            prefs.saveFontFamily(s.fontFamily)
-            prefs.saveLineSpacing(s.lineSpacing)
             prefs.saveThemeId(s.themeId)
-            _state.value = s.copy(saved = true)
         }
     }
 

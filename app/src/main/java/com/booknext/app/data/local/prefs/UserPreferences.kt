@@ -32,6 +32,9 @@ class UserPreferences @Inject constructor(
         private val LINE_SPACING = floatPreferencesKey("line_spacing")
         private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
         private val THEME_ID = stringPreferencesKey("theme_id")
+        private val UI_FONT_SCALE = floatPreferencesKey("ui_font_scale")
+        private val UI_FONT_FAMILY = stringPreferencesKey("ui_font_family")
+        private val UI_LINE_SPACING = floatPreferencesKey("ui_line_spacing")
         private val EMPTY_FOLDERS = stringSetPreferencesKey("empty_folders")
         private val HAS_SEEN_WELCOME_KEY = booleanPreferencesKey("has_seen_welcome")
         // ── 可视选项 ─────────────────────────────────────
@@ -103,6 +106,9 @@ class UserPreferences @Inject constructor(
     val lineSpacing: Flow<Float> = context.dataStore.data.map { it[LINE_SPACING] ?: 1.8f }
     val customFontPath: Flow<String> = context.dataStore.data.map { it[CUSTOM_FONT_PATH] ?: "" }
     val themeId: Flow<String> = context.dataStore.data.map { it[THEME_ID] ?: "blue" }
+    val uiFontScale: Flow<Float> = context.dataStore.data.map { it[UI_FONT_SCALE] ?: 1.0f }
+    val uiFontFamily: Flow<String> = context.dataStore.data.map { it[UI_FONT_FAMILY] ?: "sans-serif" }
+    val uiLineSpacing: Flow<Float> = context.dataStore.data.map { it[UI_LINE_SPACING] ?: 1.5f }
     val screenOrientation: Flow<String> = context.dataStore.data.map { it[SCREEN_ORIENTATION] ?: "auto" }
     val brightness: Flow<Float> = context.dataStore.data.map { it[BRIGHTNESS] ?: -1f }
     val nameReplacements: Flow<String> = context.dataStore.data.map { it[NAME_REPLACEMENTS] ?: "" }
@@ -195,6 +201,18 @@ class UserPreferences @Inject constructor(
 
     suspend fun saveThemeId(id: String) {
         context.dataStore.edit { it[THEME_ID] = id }
+    }
+
+    suspend fun saveUiFontScale(v: Float) {
+        context.dataStore.edit { it[UI_FONT_SCALE] = v }
+    }
+
+    suspend fun saveUiFontFamily(v: String) {
+        context.dataStore.edit { it[UI_FONT_FAMILY] = v }
+    }
+
+    suspend fun saveUiLineSpacing(v: Float) {
+        context.dataStore.edit { it[UI_LINE_SPACING] = v }
     }
 
     suspend fun saveScreenOrientation(orientation: String) {
