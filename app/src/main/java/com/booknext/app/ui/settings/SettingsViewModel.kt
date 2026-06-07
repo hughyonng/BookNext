@@ -87,7 +87,10 @@ class SettingsViewModel @Inject constructor(
     fun onFontSizeChange(v: Int) { _state.value = _state.value.copy(fontSize = v, saved = false) }
     fun onFontFamilyChange(v: String) { _state.value = _state.value.copy(fontFamily = v, saved = false) }
     fun onLineSpacingChange(v: Float) { _state.value = _state.value.copy(lineSpacing = v, saved = false) }
-    fun onThemeChange(id: String) { _state.value = _state.value.copy(themeId = id, saved = false) }
+    fun onThemeChange(id: String) {
+        _state.value = _state.value.copy(themeId = id, saved = false)
+        viewModelScope.launch { prefs.saveThemeId(id) }
+    }
     fun onCustomFontPicked(uri: android.net.Uri) {
         viewModelScope.launch {
             context.contentResolver.takePersistableUriPermission(

@@ -1,22 +1,25 @@
 package com.booknext.app.ui.drawer
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,33 +51,24 @@ fun DrawerContent(
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center,
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isDarkMode) Color(0xFF2A2A2A) else Color.White,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.MenuBook,
+                        Image(
+                            painter = painterResource(
+                                if (isDarkMode) com.booknext.app.R.drawable.drawer_logo_night
+                                else com.booknext.app.R.drawable.drawer_logo
+                            ),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(28.dp),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .scale(1.15f),
                         )
-                    }
-                    if (isLoggedIn) {
-                        Spacer(Modifier.width(12.dp))
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = Color(0xFF4CAF50),
-                        ) {
-                            Text("  已登录  ",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(vertical = 3.dp),
-                            )
-                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -115,6 +109,9 @@ fun DrawerContent(
                 if (isDarkMode) "日间" else "夜间",
                 onClick = onDarkModeToggle,
             )
+            if (isLoggedIn) {
+                NavIconButton(Icons.Default.CheckCircle, "已登录", onClick = {})
+            }
             NavIconButton(Icons.AutoMirrored.Filled.ExitToApp, "退出", onClick = onLogout,
                 tint = MaterialTheme.colorScheme.error)
         }

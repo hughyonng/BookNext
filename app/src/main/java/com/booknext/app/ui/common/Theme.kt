@@ -41,7 +41,15 @@ fun BookNextTheme(
             onBackground = Color(0xFFE0E0E0),
         )
     } else {
-        lightColorScheme(primary = appTheme.primary, background = appTheme.background, surface = appTheme.surface)
+        lightColorScheme(
+            primary = appTheme.primary,
+            background = appTheme.background,
+            surface = appTheme.surface,
+            primaryContainer = appTheme.primary.copy(alpha = 0.12f),
+            onPrimaryContainer = appTheme.primary,
+            secondaryContainer = appTheme.primary.copy(alpha = 0.08f),
+            onSecondaryContainer = appTheme.primary,
+        )
     }
 
     CompositionLocalProvider(LocalAppTheme provides appTheme) {
