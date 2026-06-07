@@ -127,7 +127,7 @@ fun DrawerContent(
                 Text("登录")
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp).navigationBarsPadding())
     }
     }
 }
