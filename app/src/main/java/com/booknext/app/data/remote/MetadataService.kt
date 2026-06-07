@@ -5,7 +5,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -20,20 +19,39 @@ class MetadataService {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     suspend fun lookup(title: String, apiKey: String): BookMetadata? = withContext(Dispatchers.IO) {
         try {
-            val encoded = URLEncoder.encode(title, "UTF-8")
-            val url = "https://www.googleapis.com/books/v1/volumes?q=intitle:$encoded&langRestrict=zh-CN&maxResults=1&key=$apiKey"
+            // 清理标题：去掉文件扩展名和截断
+            val cleanTitle = title
+                .replace(Regex("\\.(epub|pdf|txt|mobi|azw3)$", RegexOption.IGNORE_CASE), "")
+                .take(60)
+            val encoded = URLEncoder.encode(cleanTitle, "UTF-8")
+            val url = "https://www.googleapis.com/books/v1/volumes?q=intitle:$encoded&maxResults=3&key=$apiKey"
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val body = response.body?.string() ?: return@withContext null
             val json = JSONObject(body)
             val items = json.optJSONArray("items") ?: return@withContext null
             if (items.length() == 0) return@withContext null
-            val info = items.getJSONObject(0).getJSONObject("volumeInfo")
+
+            // 取第一个有作者的结果
+            var best: JSONObject? = null
+            for (i in 0 until items.length()) {
+                val item = items.getJSONObject(i)
+                val info = item.optJSONObject("volumeInfo")
+                if (info != null && info.optJSONArray("authors") != null && info.optJSONArray("authors")!!.length() > 0) {
+                    best = info
+                    break
+                }
+            }
+            if (best == null) {
+                best = items.getJSONObject(0).optJSONObject("volumeInfo")
+                if (best == null) return@withContext null
+            }
+            val info = best!!
 
             val authors = mutableListOf<String>()
             val authorsArr = info.optJSONArray("authors")

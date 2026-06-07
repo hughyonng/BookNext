@@ -11,7 +11,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -668,8 +667,15 @@ fun BookshelfScreen(
 
     if (showMetadataDialog) {
         val isRunning = metadataState is MetadataState.Running
-        val savedKey = prefs.googleBooksApiKey.collectAsState(initial = "")
-        LaunchedEffect(showMetadataDialog) { metadataApiKey = savedKey.value }
+        val savedKey by prefs.googleBooksApiKey.collectAsState(initial = "")
+        LaunchedEffect(savedKey) {
+            if (savedKey.isNotEmpty() && metadataApiKey.isEmpty()) metadataApiKey = savedKey
+        }
+
+        // 待补全数量
+        val pendingCount = remember(books) {
+            books.count { it.author.isNullOrEmpty() || it.author == "未知" }
+        }
 
         AlertDialog(
             onDismissRequest = { if (!isRunning) { showMetadataDialog = false; viewModel.resetMetadataState() } },
@@ -677,6 +683,7 @@ fun BookshelfScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("从 Google Books API 自动补全作者、封面等信息", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("待补全 ${pendingCount} 本书", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     if (metadataState is MetadataState.Idle || metadataState is MetadataState.Done) {
                         OutlinedTextField(value = metadataApiKey, onValueChange = { metadataApiKey = it },
                             label = { Text("Google Books API 密钥") }, modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !isRunning)
@@ -695,8 +702,8 @@ fun BookshelfScreen(
             },
             confirmButton = {
                 when (metadataState) {
-                    is MetadataState.Idle -> TextButton(onClick = { val key = metadataApiKey.trim(); if (key.isNotEmpty()) viewModel.autoFillMetadata(key) },
-                        enabled = metadataApiKey.trim().isNotEmpty()) { Text("开始补全") }
+                    is MetadataState.Idle -> TextButton(onClick = { val key = metadataApiKey.trim(); if (key.isNotEmpty()) { viewModel.autoFillMetadata(key); showMetadataDialog = false } },
+                        enabled = metadataApiKey.trim().isNotEmpty()) { Text("后台补全") }
                     is MetadataState.Running -> {}
                     is MetadataState.Done -> TextButton(onClick = { showMetadataDialog = false; viewModel.resetMetadataState() }) { Text("完成") }
                     else -> {}
