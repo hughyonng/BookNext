@@ -166,8 +166,8 @@ class CloudViewModel @Inject constructor(
                 val author = "未知".toRequestBody("text/plain".toMediaType())
                 val ocr = "false".toRequestBody("text/plain".toMediaType())
 
-                apiClient.api().uploadBook(filePart, title, author, ocr)
-                updateTransfer(transferId) { it.copy(status = TransferStatus.SUCCESS, transferredBytes = totalBytes) }
+                val response = apiClient.api().uploadBook(filePart, title, author, ocr)
+                updateTransfer(transferId) { it.copy(status = TransferStatus.SUCCESS, transferredBytes = totalBytes, bookId = response.bookId) }
                 delay(1500)
                 load()
             } catch (e: Exception) {
