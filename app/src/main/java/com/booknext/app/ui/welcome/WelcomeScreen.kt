@@ -1,12 +1,14 @@
 package com.booknext.app.ui.welcome
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,11 +26,10 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.MenuBook,
+        Image(
+            painter = painterResource(com.booknext.app.R.drawable.drawer_logo),
             contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)),
         )
 
         Spacer(Modifier.height(24.dp))
