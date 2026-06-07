@@ -1,13 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:gravity="center">
-        <shape android:shape="rectangle">
-            <solid android:color="#FFFFFF" />
-        </shape>
-    </item>
-    <item>
-        <bitmap
-            android:drawable="@drawable/ic_app_logo"
-            android:gravity="center" />
-    </item>
-</layer-list>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_app_logo"
+    android:inset="18dp" />
