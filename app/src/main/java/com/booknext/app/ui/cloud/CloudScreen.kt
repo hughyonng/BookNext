@@ -40,6 +40,8 @@ import kotlinx.coroutines.runBlocking
 fun CloudScreen(
     onMenuClick: () -> Unit,
     onBookClick: (String) -> Unit,
+    isLoggedIn: Boolean = true,
+    pendingUploadUri: android.net.Uri? = null,
     viewModel: CloudViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -79,6 +81,32 @@ fun CloudScreen(
 
     val runningTransfers = remember(transfers) { transfers.filter { it.status == TransferStatus.RUNNING } }
     val hasRunning = runningTransfers.isNotEmpty()
+
+    // 来自本地导入的待上传文件
+    LaunchedEffect(pendingUploadUri) {
+        if (pendingUploadUri != null && isLoggedIn) {
+            viewModel.uploadFile(context, pendingUploadUri)
+        }
+    }
+
+    if (!isLoggedIn) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("我的云盘") },
+                    navigationIcon = { IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, "菜单") } },
+                )
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.CloudOff, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("请先登录以访问云盘", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        return
+    }
 
     Scaffold(
         topBar = {

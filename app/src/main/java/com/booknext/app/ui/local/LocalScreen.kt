@@ -24,16 +24,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun LocalScreen(
     onBookClick: (String) -> Unit,
     onMenuClick: () -> Unit,
+    isLoggedIn: Boolean = true,
+    onImportToCloud: (Uri) -> Unit = {},
     viewModel: LocalViewModel = hiltViewModel(),
 ) {
     val localBooks by viewModel.localBooks.collectAsState()
     val context = LocalContext.current
     var selectedPaths by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { viewModel.importFile(context, it) }
+        if (uri != null) {
+            viewModel.importFile(context, uri)
+            if (isLoggedIn) {
+                pendingImportUri = uri
+                showImportDialog = true
+            }
+        }
     }
 
     Scaffold(
@@ -148,6 +158,27 @@ fun LocalScreen(
                 }
             }
         }
+    }
+
+    if (showImportDialog && pendingImportUri != null) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false; pendingImportUri = null },
+            title = { Text("导入完成") },
+            text = { Text("已保存到本地。是否同时上传到云端？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val uri = pendingImportUri ?: return@TextButton
+                    showImportDialog = false
+                    pendingImportUri = null
+                    onImportToCloud(uri)
+                }) { Text("上传到云端") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false; pendingImportUri = null }) {
+                    Text("仅本地保存")
+                }
+            },
+        )
     }
 }
 

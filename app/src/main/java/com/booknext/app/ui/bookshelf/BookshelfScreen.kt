@@ -240,9 +240,14 @@ fun BookshelfScreen(
     onUploadClick: () -> Unit,
     showFavoritesOnly: Boolean = false,
     onFavoritesFilterCleared: () -> Unit = {},
+    isLoggedIn: Boolean = true,
     viewModel: BookshelfViewModel = hiltViewModel(),
 ) {
-    val books by viewModel.books.collectAsState()
+    val allBooks by viewModel.books.collectAsState()
+    // 退出登录时只显示本地已下载文件
+    val books = remember(allBooks, isLoggedIn) {
+        if (isLoggedIn) allBooks else allBooks.filter { it.filePath != null }
+    }
     val syncState by viewModel.syncState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val metadataState by viewModel.metadataState.collectAsState()
@@ -379,6 +384,7 @@ fun BookshelfScreen(
                             }, "布局")
                         }
                         IconButton(onClick = onUploadClick) { Icon(Icons.Default.Add, "上传书籍") }
+                        if (isLoggedIn) {
                         IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "更多") }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(text = { Text("排序方式") },
@@ -396,6 +402,11 @@ fun BookshelfScreen(
                             DropdownMenuItem(text = { Text("补全书籍信息") }, onClick = {
                                 showMenu = false; showMetadataDialog = true
                             }, leadingIcon = { Icon(Icons.Default.CloudDownload, null) })
+                        }
+                        } else {
+                            Text("离线模式", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 8.dp))
                         }
                     }
                 },

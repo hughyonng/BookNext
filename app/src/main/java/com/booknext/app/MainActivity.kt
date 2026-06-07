@@ -138,6 +138,7 @@ fun MainDrawerScaffold(
     var showStats by remember { mutableStateOf(false) }
     var showFavoritesOnly by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
+    var pendingCloudUpload by remember { mutableStateOf<android.net.Uri?>(null) }
 
     BackHandler(enabled = readerBookId != null || showSettings || showQuotes || showStats || showFavoritesOnly || showBookmarks || drawerState.isOpen) {
         when {
@@ -245,6 +246,7 @@ fun MainDrawerScaffold(
                         onUploadClick = { currentPage = DrawerPage.CLOUD },
                         showFavoritesOnly = showFavoritesOnly,
                         onFavoritesFilterCleared = { showFavoritesOnly = false },
+                        isLoggedIn = isLoggedIn,
                     )
                     DrawerPage.CATEGORY -> CategoryScreen(
                         onBookClick = { readerBookId = it },
@@ -253,10 +255,17 @@ fun MainDrawerScaffold(
                     DrawerPage.LOCAL -> LocalScreen(
                         onBookClick = { readerBookId = it },
                         onMenuClick = { scope.launch { drawerState.open() } },
+                        isLoggedIn = isLoggedIn,
+                        onImportToCloud = { uri ->
+                            pendingCloudUpload = uri
+                            currentPage = DrawerPage.CLOUD
+                        },
                     )
                     DrawerPage.CLOUD -> CloudScreen(
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onBookClick = { readerBookId = it },
+                        isLoggedIn = isLoggedIn,
+                        pendingUploadUri = pendingCloudUpload.also { pendingCloudUpload = null },
                     )
                     DrawerPage.ONLINE_LIBRARY -> OnlineLibraryScreen(
                         onBack = { currentPage = DrawerPage.RECENT },
