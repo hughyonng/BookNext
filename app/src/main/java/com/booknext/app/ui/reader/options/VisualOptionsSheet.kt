@@ -20,7 +20,7 @@ data class VisualOptions(
     val fontFamily: String = "serif",
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun VisualOptionsSheet(
     options: VisualOptions,
@@ -80,9 +80,12 @@ fun VisualOptionsSheet(
             val fonts = listOf(
                 "serif" to "衬线（宋体）",
                 "sans-serif" to "无衬线（黑体）",
+                "sans-serif-light" to "细体",
+                "sans-serif-medium" to "中黑体",
                 "monospace" to "等宽",
+                "cursive" to "手写体",
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 fonts.forEach { (key, label) ->
                     FilterChip(
                         selected = opt.fontFamily == key,

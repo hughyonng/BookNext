@@ -351,6 +351,7 @@ fun TxtReaderScreen(
                             tv.textSize = currentFontSize.toFloat()
                             tv.setTextColor(textColor)
                             tv.setLineSpacing(0f, lineSpacing)
+                            try { tv.typeface = android.graphics.Typeface.create(fontFamily, android.graphics.Typeface.NORMAL) } catch (_: Exception) {}
                             tv.tag = i
                         },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),

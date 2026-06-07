@@ -560,7 +560,9 @@ private suspend fun openEpubPublication(
         lineHeight = if (lineSpacing != 1.8f) lineSpacing.toDouble() else null,
         fontFamily = when (fontFamilyValue) {
             "sans-serif" -> org.readium.r2.navigator.preferences.FontFamily.SANS_SERIF
+            "sans-serif-light", "sans-serif-medium" -> org.readium.r2.navigator.preferences.FontFamily.SANS_SERIF
             "monospace" -> org.readium.r2.navigator.preferences.FontFamily.MONOSPACE
+            "cursive" -> org.readium.r2.navigator.preferences.FontFamily.SERIF
             else -> org.readium.r2.navigator.preferences.FontFamily.SERIF
         },
         theme = Theme.LIGHT, // 始终用 LIGHT，暗色由 Compose 覆盖层控制
