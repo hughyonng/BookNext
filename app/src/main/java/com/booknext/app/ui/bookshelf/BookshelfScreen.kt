@@ -111,6 +111,20 @@ fun BookCard(
                     Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
                 }
             }
+            // 书籍来源标记
+            if (book.bookId.startsWith("local_")) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(18.dp)
+                        .background(Color(0xFF5C6BC0), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Description, null, tint = Color.White, modifier = Modifier.size(11.dp)) }
+            } else if (book.filePath == null) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(18.dp)
+                        .background(Color(0xFF78909C), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Cloud, null, tint = Color.White, modifier = Modifier.size(11.dp)) }
+            }
         }
         Spacer(Modifier.height(5.dp))
     }
@@ -170,27 +184,43 @@ fun ListBookRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Card(
-            modifier = Modifier.size(width = 44.dp, height = 60.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            shape = RoundedCornerShape(6.dp),
-        ) {
-            if (book.coverPath != null) {
-                AsyncImage(model = File(book.coverPath), contentDescription = book.title,
-                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else if (book.hasCover) {
-                AsyncImage(model = "$baseUrl/api/cover/${book.bookId}?k=$apiKey",
-                    contentDescription = book.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                val bg = when (book.format.lowercase()) {
-                    "epub" -> Color(0xFF1565C0); "pdf" -> Color(0xFFC62828)
-                    "txt" -> Color(0xFF2E7D32); "mobi", "azw3" -> Color(0xFF6A1B9A)
-                    else -> Color(0xFF37474F)
+        Box(Modifier.size(width = 44.dp, height = 60.dp)) {
+            Card(
+                modifier = Modifier.fillMaxSize(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(6.dp),
+            ) {
+                if (book.coverPath != null) {
+                    AsyncImage(model = File(book.coverPath), contentDescription = book.title,
+                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else if (book.hasCover) {
+                    AsyncImage(model = "$baseUrl/api/cover/${book.bookId}?k=$apiKey",
+                        contentDescription = book.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    val bg = when (book.format.lowercase()) {
+                        "epub" -> Color(0xFF1565C0); "pdf" -> Color(0xFFC62828)
+                        "txt" -> Color(0xFF2E7D32); "mobi", "azw3" -> Color(0xFF6A1B9A)
+                        else -> Color(0xFF37474F)
+                    }
+                    Box(Modifier.fillMaxSize().background(bg), contentAlignment = Alignment.Center) {
+                        Text(book.format.uppercase(), color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Box(Modifier.fillMaxSize().background(bg), contentAlignment = Alignment.Center) {
-                    Text(book.format.uppercase(), color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                }
+            }
+            // 书籍来源标记
+            if (book.bookId.startsWith("local_")) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).size(14.dp)
+                        .background(Color(0xFF5C6BC0), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Description, null, tint = Color.White, modifier = Modifier.size(9.dp)) }
+            } else if (book.filePath == null) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).size(14.dp)
+                        .background(Color(0xFF78909C), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Cloud, null, tint = Color.White, modifier = Modifier.size(9.dp)) }
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
@@ -286,6 +316,11 @@ fun BookshelfScreen(
     }
 
     val folders by viewModel.folders.collectAsState()
+    // 离线模式下分类标签只统计本地书籍的分类
+    val localFolders = remember(folders, books, isLoggedIn) {
+        if (isLoggedIn) folders
+        else books.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
+    }
     val localViewModel: LocalViewModel = hiltViewModel()
     val importFilePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -415,7 +450,7 @@ fun BookshelfScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             // ── 分类标签栏 ──
-            val tabLabels = remember(folders) { listOf("全部") + folders }
+            val tabLabels = remember(localFolders) { listOf("全部") + localFolders }
             val selectedTabIndex = remember(selectedFolder, tabLabels) {
                 if (selectedFolder == null) 0 else (tabLabels.indexOf(selectedFolder).coerceAtLeast(0))
             }

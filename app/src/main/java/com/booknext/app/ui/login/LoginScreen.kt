@@ -32,10 +32,11 @@ fun LoginScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp).imePadding(),
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(Modifier.height(32.dp))
             Text("BookNext", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(8.dp))
             Text("你的云端书库，随存随读", style = MaterialTheme.typography.bodyMedium)
