@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 
 data class OtherOptions(
     val showStatusBar: Boolean = false,
+    val showNavBar: Boolean = false,
     val keepScreenOn: Boolean = true,
     val edgeSwipeBrightness: Boolean = true,
     val edgeSwipeFontSize: Boolean = false,

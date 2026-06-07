@@ -106,6 +106,8 @@ fun EpubReaderScreen(
     bookmarks: List<Int> = emptyList(),
     onAddBookmark: (Int) -> Unit = {},
     readerBgColor: String = "",
+    showStatusBar: Boolean = false,
+    showNavBar: Boolean = false,
 ) {
     var uiVisible by remember { mutableStateOf(true) }
     var totalPages by remember { mutableIntStateOf(1) }
@@ -181,6 +183,8 @@ fun EpubReaderScreen(
                 tocEntries = tocEntries,
                 bookmarks = bookmarks,
                 isTtsPlaying = epubTtsPlaying,
+                showStatusBar = showStatusBar,
+                showNavBar = showNavBar,
             ),
             visible = uiVisible,
             onBack = onBack,

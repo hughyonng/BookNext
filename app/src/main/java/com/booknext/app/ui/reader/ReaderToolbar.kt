@@ -53,6 +53,8 @@ data class ReaderToolbarState(
     val isTtsPlaying: Boolean = false,
     val tocEntries: List<TocEntry> = emptyList(),
     val bookmarks: List<Int> = emptyList(),
+    val showStatusBar: Boolean = false,
+    val showNavBar: Boolean = false,
 )
 
 @Composable
@@ -132,6 +134,7 @@ fun ReaderToolbarOverlay(
     var showShare by remember { mutableStateOf(false) }
     var showTranslateSettings by remember { mutableStateOf(false) }
     var showBgColor by remember { mutableStateOf(false) }
+    var showReadingSettings by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
 
@@ -186,6 +189,7 @@ fun ReaderToolbarOverlay(
                                 "书签" to "Bookmarks",
                                 "搜索" to "Search",
                                 "背景" to "BgColor",
+                                "阅读设置" to "ReadingSettings",
                                 "词典" to "Dictionary",
                                 "翻译设置" to "TranslateSettings",
                             ).forEach { (label, action) ->
@@ -199,6 +203,7 @@ fun ReaderToolbarOverlay(
                                             "Bookmarks" -> showBookmarks = true
                                             "Search" -> { showSearchBar = true; onSearchRequest() }
                                             "BgColor" -> showBgColor = true
+                                            "ReadingSettings" -> showReadingSettings = true
                                             "Dictionary" -> onDictionaryLookup()
                                             "TranslateSettings" -> showTranslateSettings = true
                                         }
@@ -388,6 +393,16 @@ fun ReaderToolbarOverlay(
                 onSelect = { hex -> onSetReaderBgColor(hex); showBgColor = false },
                 onReset = { onSetReaderBgColor(""); showBgColor = false },
                 onDismiss = { showBgColor = false },
+            )
+        }
+
+        if (showReadingSettings) {
+            ReadingSettingsDialog(
+                showStatusBar = state.showStatusBar,
+                showNavBar = state.showNavBar,
+                onToggleStatusBar = { onSaveSetting("showStatusBar", !state.showStatusBar) },
+                onToggleNavBar = { onSaveSetting("showNavBar", !state.showNavBar) },
+                onDismiss = { showReadingSettings = false },
             )
         }
 
@@ -896,5 +911,46 @@ private fun BgColorCircle(opt: BgColorOption, onSelect: (String) -> Unit, modifi
         )
         Spacer(Modifier.height(4.dp))
         Text(opt.label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun ReadingSettingsDialog(
+    showStatusBar: Boolean,
+    showNavBar: Boolean,
+    onToggleStatusBar: () -> Unit,
+    onToggleNavBar: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("阅读设置", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                ReadingSettingToggle("显示顶部状态栏", showStatusBar, onToggleStatusBar)
+                ReadingSettingToggle("显示底部导航栏", showNavBar, onToggleNavBar)
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+    )
+}
+
+@Composable
+private fun ReadingSettingToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = { onCheckedChange() })
     }
 }

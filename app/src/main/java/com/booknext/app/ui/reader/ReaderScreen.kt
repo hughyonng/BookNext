@@ -88,6 +88,25 @@ fun ReaderScreen(
         }
     }
 
+    // 状态栏/导航栏显示控制
+    val showStatusBar = readerOtherOptions.showStatusBar
+    val showNavBar = readerOtherOptions.showNavBar
+    LaunchedEffect(showStatusBar, showNavBar) {
+        val activity = context as? android.app.Activity ?: return@LaunchedEffect
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            val controller = activity.window.insetsController
+            if (controller != null) {
+                if (showStatusBar) controller.show(android.view.WindowInsets.Type.statusBars())
+                else controller.hide(android.view.WindowInsets.Type.statusBars())
+                if (showNavBar) controller.show(android.view.WindowInsets.Type.navigationBars())
+                else controller.hide(android.view.WindowInsets.Type.navigationBars())
+                if (!showStatusBar || !showNavBar) {
+                    controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+        }
+    }
+
     if (showSidebar) {
         AnnotationSidebar(
             annotations = annotations,
@@ -112,9 +131,10 @@ fun ReaderScreen(
                 val activity = context as? android.app.Activity
                 val onSaveSetting: (String, Any) -> Unit = { key, value ->
                     when (key) {
-                        "screenOrientation" -> if (value is String) { viewModel.setScreenOrientation(value); applyOrientation(activity, value) }
-                        "keepScreenOn" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(keepScreenOn = value))
                         "showStatusBar" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(showStatusBar = value))
+                        "showNavBar" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(showNavBar = value))
+                        "keepScreenOn" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(keepScreenOn = value))
+                        "screenOrientation" -> if (value is String) { viewModel.setScreenOrientation(value); applyOrientation(activity, value) }
                     }
                 }
                 Box {
@@ -189,6 +209,8 @@ fun ReaderScreen(
                             },
                             onSetReaderBgColor = { viewModel.setBgColor(it) },
                             readerBgColor = readerBgColor,
+                            showStatusBar = readerOtherOptions.showStatusBar,
+                            showNavBar = readerOtherOptions.showNavBar,
                         )
                         "txt", "mobi", "azw3" -> TxtReaderScreen(
                             file = s.file,
@@ -210,60 +232,9 @@ fun ReaderScreen(
                                 selectedText = text
                                 selectedLocator = if (loc >= 0) "txt_line_${loc}_${start}_${end}" else "0"
                             },
-                            onDarkModeChange = { enabled ->
-                                viewModel.setDarkMode(enabled)
-                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
-                            },
-                            onFontSizeChange = { viewModel.setFontSize(it) },
-                            book = book,
-                            sessions = sessions,
-                            annotations = annotations,
-                            coverUrl = viewModel.coverUrl,
-                            onToggleFavorite = { viewModel.toggleFavorite() },
-                            onSaveVisualOptions = { viewModel.saveVisualOptions(it) },
-                            onSaveControlOptions = { viewModel.saveControlOptions(it) },
-                            onSaveOtherOptions = { viewModel.saveOtherOptions(it) },
-                            bookmarks = bookmarks,
-                            onAddBookmark = { viewModel.toggleBookmark(it) },
-                            nameReplacements = nameReplacements,
-                            onNameReplaceChange = { viewModel.setNameReplacements(it) },
-                            smartIndent = smartIndentPref,
-                            removeExtraBlank = removeExtraBlankPref,
-                            fontFamily = fontFamily,
-                            lineSpacing = lineSpacing,
-                            onOrientationChange = { viewModel.setScreenOrientation(it) },
-                            onBrightnessChange = { viewModel.setBrightness(it) },
-                            onSaveSetting = onSaveSetting,
-                            onSetTranslateEngine = { viewModel.setTranslateEngine(it) },
-                            onSetTranslateTargetLang = { viewModel.setTranslateTargetLang(it) },
-                            onTranslateText = {
-                                if (selectedText.isEmpty()) {
-                                    android.widget.Toast.makeText(context, "请先长按选择要翻译的文字", android.widget.Toast.LENGTH_SHORT).show()
-                                } else {
-                                    translateResult = null
-                                    translateLoading = true
-                                    showTranslateDialog = true
-                                }
-                            },
-                            onDictionaryLookup = {
-                                if (selectedText.isEmpty()) {
-                                    android.widget.Toast.makeText(context, "请先长按选择要查词的文字", android.widget.Toast.LENGTH_SHORT).show()
-                                } else {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_PROCESS_TEXT).apply {
-                                        type = "text/plain"
-                                        putExtra(android.content.Intent.EXTRA_PROCESS_TEXT, selectedText)
-                                        putExtra(android.content.Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-                                    }
-                                    val apps = context.packageManager.queryIntentActivities(intent, 0)
-                                    if (apps.isEmpty()) {
-                                        android.widget.Toast.makeText(context, "未检测到词典应用", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        context.startActivity(android.content.Intent.createChooser(intent, "选择词典"))
-                                    }
-                                }
-                            },
                             readerBgColor = readerBgColor,
-                            onSetReaderBgColor = { viewModel.setBgColor(it) },
+                            showStatusBar = readerOtherOptions.showStatusBar,
+                            showNavBar = readerOtherOptions.showNavBar,
                         )
                         "docx", "doc" -> TxtReaderScreen(
                             file = s.file,
@@ -337,6 +308,9 @@ fun ReaderScreen(
                                     }
                                 }
                             },
+                            readerBgColor = readerBgColor,
+                            showStatusBar = readerOtherOptions.showStatusBar,
+                            showNavBar = readerOtherOptions.showNavBar,
                         )
                         "md" -> TxtReaderScreen(
                             file = s.file,
@@ -395,6 +369,9 @@ fun ReaderScreen(
                                     }
                                 }
                             },
+                            readerBgColor = readerBgColor,
+                            showStatusBar = readerOtherOptions.showStatusBar,
+                            showNavBar = readerOtherOptions.showNavBar,
                         )
                         "pdf" -> PdfReaderScreen(
                             file = s.file,

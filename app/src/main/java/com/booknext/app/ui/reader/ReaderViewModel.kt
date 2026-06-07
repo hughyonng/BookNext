@@ -153,6 +153,8 @@ class ReaderViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.3f)
     val showStatusBar: StateFlow<Boolean> = prefs.showStatusBar
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val showNavBar: StateFlow<Boolean> = prefs.showNavBar
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val keepLastLine: StateFlow<Boolean> = prefs.keepLastLine
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val readingReminder: StateFlow<Boolean> = prefs.readingReminder
@@ -210,7 +212,7 @@ class ReaderViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ControlOptions())
     val otherOptions: StateFlow<OtherOptions> = combine(
         listOf<Flow<*>>(
-            showStatusBar, keepScreenOn, edgeSwipeBrightness, edgeSwipeFontSize,
+            showStatusBar, showNavBar, keepScreenOn, edgeSwipeBrightness, edgeSwipeFontSize,
             keepLastLine, smartIndent, removeExtraBlank, blueLight, blueLightAmount,
             readingReminder, readingReminderMins, ttsSplitMode, allowTiltFlip,
             allowPinchFont, allowSwipeFlip, epubUseBookFont, epubDisableCss,
@@ -218,16 +220,16 @@ class ReaderViewModel @Inject constructor(
         )
     ) { arr ->
         OtherOptions(
-            showStatusBar = arr[0] as Boolean, keepScreenOn = arr[1] as Boolean,
-            edgeSwipeBrightness = arr[2] as Boolean, edgeSwipeFontSize = arr[3] as Boolean,
-            keepLastLine = arr[4] as Boolean, smartIndent = arr[5] as Boolean,
-            removeExtraBlank = arr[6] as Boolean, blueLight = arr[7] as Boolean,
-            blueLightAmount = arr[8] as Float,
-            readingReminder = arr[9] as Boolean, readingReminderMins = arr[10] as Int,
-            ttsSplitMode = arr[11] as String, allowTiltFlip = arr[12] as Boolean,
-            allowPinchFont = arr[13] as Boolean, allowSwipeFlip = arr[14] as Boolean,
-            epubUseBookFont = arr[15] as Boolean, epubDisableCss = arr[16] as Boolean,
-            epubShowAnnotations = arr[17] as Boolean,
+            showStatusBar = arr[0] as Boolean, showNavBar = arr[1] as Boolean, keepScreenOn = arr[2] as Boolean,
+            edgeSwipeBrightness = arr[3] as Boolean, edgeSwipeFontSize = arr[4] as Boolean,
+            keepLastLine = arr[5] as Boolean, smartIndent = arr[6] as Boolean,
+            removeExtraBlank = arr[7] as Boolean, blueLight = arr[8] as Boolean,
+            blueLightAmount = arr[9] as Float,
+            readingReminder = arr[10] as Boolean, readingReminderMins = arr[11] as Int,
+            ttsSplitMode = arr[12] as String, allowTiltFlip = arr[13] as Boolean,
+            allowPinchFont = arr[14] as Boolean, allowSwipeFlip = arr[15] as Boolean,
+            epubUseBookFont = arr[16] as Boolean, epubDisableCss = arr[17] as Boolean,
+            epubShowAnnotations = arr[18] as Boolean,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OtherOptions())
 
@@ -478,7 +480,7 @@ class ReaderViewModel @Inject constructor(
     fun saveOtherOptions(opt: com.booknext.app.ui.reader.options.OtherOptions) {
         viewModelScope.launch {
             prefs.saveOtherOptions(
-                showStatusBar = opt.showStatusBar, keepScreenOn = opt.keepScreenOn,
+                showStatusBar = opt.showStatusBar, showNavBar = opt.showNavBar, keepScreenOn = opt.keepScreenOn,
                 edgeSwipeBrightness = opt.edgeSwipeBrightness,
                 edgeSwipeFontSize = opt.edgeSwipeFontSize,
                 keepLastLine = opt.keepLastLine, smartIndent = opt.smartIndent,
