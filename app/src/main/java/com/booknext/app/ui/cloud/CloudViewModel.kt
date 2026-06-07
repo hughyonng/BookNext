@@ -44,6 +44,7 @@ data class TransferItem(
     val id: String,
     val fileName: String,
     val type: TransferType,
+    val bookId: String? = null,
     val totalBytes: Long = 0L,
     val transferredBytes: Long = 0L,
     val status: TransferStatus = TransferStatus.RUNNING,
@@ -183,7 +184,7 @@ class CloudViewModel @Inject constructor(
             val safeName = book.title.replace(Regex("[/\\\\:*?\"<>|]"), "_")
             val fileName = "$safeName.$ext"
             val transferId = UUID.randomUUID().toString()
-            addTransfer(TransferItem(id = transferId, fileName = fileName, type = TransferType.DOWNLOAD, totalBytes = book.fileSize))
+            addTransfer(TransferItem(id = transferId, fileName = fileName, type = TransferType.DOWNLOAD, bookId = book.bookId, totalBytes = book.fileSize))
 
             viewModelScope.launch(Dispatchers.IO) {
                 try {

@@ -3,11 +3,7 @@ package com.booknext.app.ui.cloud
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -244,31 +240,15 @@ fun CloudScreen(
         }
     }
 
-    // ── 传输记录详情面板 ──
+    // ── 传输记录全屏页 ──
     if (showTransferSheet) {
-        ModalBottomSheet(onDismissRequest = { showTransferSheet = false }) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("传输记录", style = MaterialTheme.typography.titleMedium)
-                    if (transfers.any { it.status != TransferStatus.RUNNING }) {
-                        TextButton(onClick = { viewModel.clearCompletedTransfers() }) {
-                            Text("清除已完成", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                if (transfers.isEmpty()) {
-                    Text("暂无传输记录", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.heightIn(max = 400.dp)) {
-                        items(transfers, key = { it.id }) { t ->
-                            TransferRow(t)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-        }
+        CloudTransferPage(
+            transfers = transfers,
+            onBack = { showTransferSheet = false },
+            onClearCompleted = { viewModel.clearCompletedTransfers() },
+            onOpenBook = { bookId -> onBookClick(bookId) },
+        )
+        return
     }
 
     // ── 其他对话框 ──
@@ -343,37 +323,141 @@ fun CloudScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TransferRow(t: TransferItem) {
-    val progress = if (t.totalBytes > 0) (t.transferredBytes.toFloat() / t.totalBytes).coerceIn(0f, 1f) else 0f
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            when (t.type) {
-                TransferType.UPLOAD -> Icons.Default.Upload
-                TransferType.DOWNLOAD -> Icons.Default.Download
-            }, null,
-            tint = when (t.status) {
-                TransferStatus.RUNNING -> MaterialTheme.colorScheme.primary
-                TransferStatus.SUCCESS -> Color(0xFF4CAF50)
-                TransferStatus.ERROR -> MaterialTheme.colorScheme.error
-            },
-            modifier = Modifier.size(18.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            Text(t.fileName, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            when (t.status) {
-                TransferStatus.RUNNING -> {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp).padding(top = 4.dp))
-                    Text("${(progress * 100).toInt()}% · ${formatSize(t.transferredBytes)}/${formatSize(t.totalBytes)}",
-                        fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun CloudTransferPage(
+    transfers: List<TransferItem>,
+    onBack: () -> Unit,
+    onClearCompleted: () -> Unit,
+    onOpenBook: (String) -> Unit,
+) {
+    val running = transfers.filter { it.status == TransferStatus.RUNNING }
+    val completed = transfers.filter { it.status != TransferStatus.RUNNING }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("传输记录") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    }
+                },
+                actions = {
+                    if (completed.isNotEmpty()) {
+                        TextButton(onClick = onClearCompleted) {
+                            Text("清除已完成", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                },
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(15.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            if (transfers.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                        Text("暂无传输记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                TransferStatus.SUCCESS -> Text("传输完成", fontSize = 10.sp, color = Color(0xFF4CAF50))
-                TransferStatus.ERROR -> Text("失败：${t.errorMessage ?: "未知错误"}",
-                    fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                return@LazyColumn
+            }
+
+            if (running.isNotEmpty()) {
+                item {
+                    Text("进行中", style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                }
+                items(running, key = { it.id }) { t ->
+                    TransferItemCard(t = t, onClick = null)
+                }
+            }
+
+            if (completed.isNotEmpty()) {
+                item {
+                    Text("已完成", style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = if (running.isNotEmpty()) 16.dp else 8.dp, bottom = 4.dp))
+                }
+                items(completed, key = { it.id }) { t ->
+                    TransferItemCard(
+                        t = t,
+                        onClick = if (t.status == TransferStatus.SUCCESS && t.bookId != null) {
+                            { onOpenBook(t.bookId!!) }
+                        } else null,
+                    )
+                }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun TransferItemCard(
+    t: TransferItem,
+    onClick: (() -> Unit)? = null,
+) {
+    val progress = if (t.totalBytes > 0) (t.transferredBytes.toFloat() / t.totalBytes).coerceIn(0f, 1f) else 0f
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                when (t.type) {
+                    TransferType.UPLOAD -> Icons.Default.Upload
+                    TransferType.DOWNLOAD -> Icons.Default.Download
+                }, null,
+                tint = when (t.status) {
+                    TransferStatus.RUNNING -> MaterialTheme.colorScheme.primary
+                    TransferStatus.SUCCESS -> Color(0xFF4CAF50)
+                    TransferStatus.ERROR -> MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.size(22.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(t.fileName, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                when (t.status) {
+                    TransferStatus.RUNNING -> {
+                        Spacer(Modifier.height(6.dp))
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp))
+                        Spacer(Modifier.height(3.dp))
+                        Text("${(progress * 100).toInt()}% · ${formatSize(t.transferredBytes)}/${formatSize(t.totalBytes)}",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TransferStatus.SUCCESS -> {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            if (t.bookId != null) "传输完成 · 点击阅读" else "传输完成",
+                            fontSize = 11.sp, color = Color(0xFF4CAF50),
+                        )
+                    }
+                    TransferStatus.ERROR -> {
+                        Spacer(Modifier.height(2.dp))
+                        Text("失败：${t.errorMessage ?: "未知错误"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            if (t.status == TransferStatus.RUNNING) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp,
+                    progress = { progress })
+            } else if (t.status == TransferStatus.SUCCESS && onClick != null) {
+                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
