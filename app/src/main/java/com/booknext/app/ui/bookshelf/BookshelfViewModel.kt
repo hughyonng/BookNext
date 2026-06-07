@@ -205,7 +205,14 @@ class BookshelfViewModel @Inject constructor(
             val allBooks = bookDao.observeAll().first()
             val needsFill = allBooks.filter { book ->
                 val a = book.author
-                a.isNullOrBlank() || a.trim() == "未知" || a.trim() == "佚名" || a.trim().equals("unknown", true) || a.length > 50
+                when {
+                    a.isNullOrBlank() -> true
+                    a.trim() == "未知" || a.trim() == "佚名" || a.trim().equals("unknown", true) -> true
+                    a.length > 40 -> true
+                    a.contains("/") || a.contains("\\") || a.contains(".") -> true
+                    a.trim() == book.title.trim().take(20) -> true
+                    else -> false
+                }
             }
             val total = needsFill.size
             if (total == 0) {

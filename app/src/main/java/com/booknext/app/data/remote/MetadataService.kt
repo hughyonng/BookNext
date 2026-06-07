@@ -24,35 +24,45 @@ class MetadataService {
 
     suspend fun lookup(title: String, apiKey: String): BookMetadata? = withContext(Dispatchers.IO) {
         try {
-            val clean = cleanTitle(title)
-            val encoded = URLEncoder.encode(clean, "UTF-8")
+            val queries = buildQueries(title)
+            for (q in queries) {
+                val meta = tryQuery(q, apiKey)
+                if (meta != null) return@withContext meta
+            }
+            null
+        } catch (_: Exception) { null }
+    }
+
+    private suspend fun tryQuery(queryTitle: String, apiKey: String): BookMetadata? {
+        try {
+            val encoded = URLEncoder.encode(queryTitle, "UTF-8")
             val url = "https://www.googleapis.com/books/v1/volumes?q=intitle:$encoded&maxResults=5&key=$apiKey"
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return@withContext null
+            val body = response.body?.string() ?: return null
             val json = JSONObject(body)
-            val items = json.optJSONArray("items") ?: return@withContext null
-            if (items.length() == 0) return@withContext null
+            val items = json.optJSONArray("items") ?: return null
+            if (items.length() == 0) return null
 
+            // 评分：标题含完整查询词 + 有作者 >= 不含查询词
             var best: JSONObject? = null
             var bestScore = -1
             for (i in 0 until items.length()) {
                 val info = items.getJSONObject(i).optJSONObject("volumeInfo") ?: continue
                 val hasAuthor = info.optJSONArray("authors")?.length() ?: 0 > 0
                 val t = info.optString("title", "")
+                val match = t.contains(queryTitle, ignoreCase = true)
                 val score = when {
-                    hasAuthor && t.contains(clean, ignoreCase = true) -> 3
+                    hasAuthor && match -> 3
                     hasAuthor -> 2
-                    t.contains(clean, ignoreCase = true) -> 1
+                    match -> 1
                     else -> 0
                 }
                 if (score >= 3) { best = info; break }
                 if (score > bestScore) { bestScore = score; best = info }
             }
-            if (best == null && items.length() > 0) {
-                best = items.getJSONObject(0).optJSONObject("volumeInfo")
-            }
-            val info = best ?: return@withContext null
+            if (best == null) best = items.getJSONObject(0).optJSONObject("volumeInfo")
+            val info = best ?: return null
 
             val authors = mutableListOf<String>()
             val authorsArr = info.optJSONArray("authors")
@@ -63,14 +73,38 @@ class MetadataService {
             val coverUrl = info.optJSONObject("imageLinks")?.optString("thumbnail")
                 ?.replace("http://", "https://")
 
-            BookMetadata(
+            return BookMetadata(
                 authors = authors,
                 publisher = info.optString("publisher", ""),
                 description = info.optString("description", ""),
                 coverUrl = coverUrl,
             )
-        } catch (_: Exception) { null }
+        } catch (_: Exception) { return null }
     }
+
+    private fun buildQueries(raw: String): List<String> {
+        var t = raw.trim()
+        val queries = mutableListOf<String>()
+        // 原书名直接查
+        queries.add(takeSensible(t))
+        // 去掉文件扩展名
+        t = t.replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        queries.add(takeSensible(t))
+        // 去掉方括号内容 [xxx] （常见于精校版/排版等标记）
+        val noBracket = t.replace(Regex("\\[.*?]"), "").trim()
+        if (noBracket != t && noBracket.length >= 2) {
+            queries.add(takeSensible(noBracket))
+            // 去掉中文括号 （xxx）
+            val noParen = noBracket.replace(Regex("[（(].{0,30}[）)]"), "").trim()
+            if (noParen != noBracket && noParen.length >= 2) queries.add(takeSensible(noParen))
+        }
+        // 取书名前 2-4 个字（最后的 fallback）
+        val short = t.take(4).trim()
+        if (short.length >= 2 && short != t) queries.add(short)
+        return queries.distinct()
+    }
+
+    private fun takeSensible(s: String) = s.trim().take(60).ifEmpty { s.take(60) }
 
     suspend fun downloadCover(url: String): ByteArray? = withContext(Dispatchers.IO) {
         try {
