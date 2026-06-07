@@ -230,24 +230,43 @@ fun ReaderToolbarOverlay(
                                                 val ctx = context
                                                 captureScope.launch(Dispatchers.IO) {
                                                     try {
-                                                        val activity = ctx as? Activity
-                                                        val root = activity?.window?.decorView?.rootView ?: return@launch
-                                                        val w = root.width
-                                                        val h = root.height
+                                                        val act = ctx as? Activity ?: return@launch
+                                                        val decor = act.window.decorView
+                                                        val w = decor.width
+                                                        val h = decor.height
                                                         if (w <= 0 || h <= 0) return@launch
-                                                        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                                                        val canvas = android.graphics.Canvas(bitmap)
-                                                        root.draw(canvas)
+                                                        // 截取全屏
+                                                        val fullBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                                        val canvas = android.graphics.Canvas(fullBitmap)
+                                                        decor.draw(canvas)
+                                                        // 先裁剪掉状态栏和导航栏区域
+                                                        val rect = android.graphics.Rect()
+                                                        decor.getWindowVisibleDisplayFrame(rect)
+                                                        val top = rect.top
+                                                        val cropHeight = rect.height()
+                                                        val visibleBitmap = if (top > 0 || cropHeight < h) {
+                                                            Bitmap.createBitmap(fullBitmap, 0, top, w, cropHeight)
+                                                        } else { fullBitmap }
+                                                        if (visibleBitmap !== fullBitmap) fullBitmap.recycle()
+                                                        // 再按封面比例裁剪（保留顶部，裁剪底部空白）
+                                                        val coverRatio = 0.72f // 宽高比
+                                                        val targetH = (w / coverRatio).toInt().coerceAtMost(visibleBitmap.height)
+                                                        val finalBitmap = if (targetH < visibleBitmap.height) {
+                                                            Bitmap.createBitmap(visibleBitmap, 0, 0, w, targetH)
+                                                        } else { visibleBitmap }
+                                                        if (finalBitmap !== visibleBitmap) visibleBitmap.recycle()
                                                         val dir = File(ctx.filesDir, "covers")
                                                         dir.mkdirs()
                                                         val coverFile = File(dir, "${b.bookId}.jpg")
                                                         FileOutputStream(coverFile).use { out ->
-                                                            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                                                            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
                                                         }
-                                                        bitmap.recycle()
+                                                        finalBitmap.recycle()
                                                         val entryPoint = EntryPointAccessors.fromApplication(ctx.applicationContext, BookDaoEntryPoint::class.java)
                                                         entryPoint.bookDao().updateCoverPath(b.bookId, coverFile.absolutePath)
-                                                        android.widget.Toast.makeText(ctx, "已设为封面", android.widget.Toast.LENGTH_SHORT).show()
+                                                        (ctx as? Activity)?.runOnUiThread {
+                                                            android.widget.Toast.makeText(ctx, "已设为封面", android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
                                                     } catch (_: Exception) { }
                                                 }
                                             }

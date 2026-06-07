@@ -50,6 +50,10 @@ class OnlineLibraryViewModel @Inject constructor(
     }
 
     private fun defaultSources() = listOf(
+        OnlineSource("Anna's Archive", "https://annas-archive.gl/", "全球最大的影子图书馆聚合搜索引擎"),
+        OnlineSource("FMHY Reading", "https://fmhy.net/reading", "Free Media Hell Yeah 阅读资源合集"),
+        OnlineSource("Z-Lib", "https://z-lib.fm/", "全球最大的数字图书馆之一"),
+        OnlineSource("MyComic", "https://mycomic.com/", "漫画在线阅读平台"),
         OnlineSource("Project Gutenberg", "https://www.gutenberg.org", "超过7万本免费电子书，版权过期经典著作"),
         OnlineSource("Standard Ebooks", "https://standardebooks.org", "精校版免费电子书，注重排版质量"),
         OnlineSource("古登堡计划中文站", "https://www.gutenberg.org/browse/languages/zh", "Project Gutenberg 中文书籍分类"),
