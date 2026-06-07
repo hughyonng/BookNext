@@ -96,6 +96,7 @@ class UserPreferences @Inject constructor(
         private val SCREEN_ORIENTATION = stringPreferencesKey("screen_orientation")
         private val BRIGHTNESS = floatPreferencesKey("brightness")
         private val NAME_REPLACEMENTS = stringPreferencesKey("name_replacements")
+        private val GOOGLE_BOOKS_API_KEY = stringPreferencesKey("google_books_api_key")
     }
 
     val serverUrl: Flow<String> = context.dataStore.data.map { it[SERVER_URL] ?: "" }
@@ -112,6 +113,7 @@ class UserPreferences @Inject constructor(
     val screenOrientation: Flow<String> = context.dataStore.data.map { it[SCREEN_ORIENTATION] ?: "auto" }
     val brightness: Flow<Float> = context.dataStore.data.map { it[BRIGHTNESS] ?: -1f }
     val nameReplacements: Flow<String> = context.dataStore.data.map { it[NAME_REPLACEMENTS] ?: "" }
+    val googleBooksApiKey: Flow<String> = context.dataStore.data.map { it[GOOGLE_BOOKS_API_KEY] ?: "" }
 
     // ── 可视选项 ─────────────────────────────────────────
     val textColor: Flow<String> = context.dataStore.data.map { it[TEXT_COLOR] ?: "" }
@@ -378,4 +380,5 @@ class UserPreferences @Inject constructor(
 
     suspend fun saveTranslateEngine(v: String) = context.dataStore.edit { it[TRANSLATE_ENGINE] = v }
     suspend fun saveTranslateTargetLang(v: String) = context.dataStore.edit { it[TRANSLATE_TARGET_LANG] = v }
+    suspend fun saveGoogleBooksApiKey(v: String) = context.dataStore.edit { it[GOOGLE_BOOKS_API_KEY] = v }
 }

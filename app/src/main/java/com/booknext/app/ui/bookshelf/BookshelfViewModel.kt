@@ -10,6 +10,7 @@ import com.booknext.app.data.local.db.BookDao
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.local.prefs.UserPreferences
 import com.booknext.app.data.remote.ApiClient
+import com.booknext.app.data.remote.MetadataService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,11 @@ class BookshelfViewModel @Inject constructor(
     // 搜索
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
+
+    // 元数据补全
+    private val _metadataState = MutableStateFlow<MetadataState>(MetadataState.Idle)
+    val metadataState: StateFlow<MetadataState> = _metadataState
+    private val metadataService = MetadataService()
 
     // 文件夹列表（合并书籍分类 + DataStore 空文件夹）
     val folders: StateFlow<List<String>> = combine(
@@ -191,6 +197,51 @@ class BookshelfViewModel @Inject constructor(
         viewModelScope.launch { bookDao.toggleFavorite(bookId) }
     }
 
+    fun autoFillMetadata(apiKey: String) {
+        if (apiKey.isBlank()) return
+        _metadataState.value = MetadataState.Running(0, 0)
+        viewModelScope.launch(Dispatchers.IO) {
+            prefs.saveGoogleBooksApiKey(apiKey)
+            val allBooks = bookDao.observeAll().first()
+            val needsFill = allBooks.filter {
+                it.author.isNullOrEmpty() || it.author == "未知"
+            }
+            val total = needsFill.size
+            if (total == 0) {
+                _metadataState.value = MetadataState.Idle
+                return@launch
+            }
+            var updated = 0
+            for ((i, book) in needsFill.withIndex()) {
+                _metadataState.value = MetadataState.Running(updated, total)
+                try {
+                    val meta = metadataService.lookup(book.title, apiKey)
+                    if (meta != null) {
+                        val author = if (meta.authors.isNotEmpty()) meta.authors.joinToString("、") else book.author
+                        var coverPath = book.coverPath
+                        if (meta.coverUrl != null) {
+                            try {
+                                val bytes = metadataService.downloadCover(meta.coverUrl)
+                                if (bytes != null) {
+                                    val coverFile = File(context.filesDir, "covers/${book.bookId}.jpg")
+                                    coverFile.parentFile?.mkdirs()
+                                    coverFile.writeBytes(bytes)
+                                    coverPath = coverFile.absolutePath
+                                }
+                            } catch (_: Exception) {}
+                        }
+                        bookDao.upsert(book.copy(author = author, coverPath = coverPath ?: book.coverPath))
+                        updated++
+                    }
+                } catch (_: Exception) {}
+                if (i < total - 1) kotlinx.coroutines.delay(250)
+            }
+            _metadataState.value = MetadataState.Done(updated)
+        }
+    }
+
+    fun resetMetadataState() { _metadataState.value = MetadataState.Idle }
+
     fun saveCoverFromUri(bookId: String, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             val coverFile = File(context.filesDir, "covers/$bookId.jpg")
@@ -270,4 +321,10 @@ sealed class SyncState {
     data object Loading : SyncState()
     data object Success : SyncState()
     data class Error(val msg: String) : SyncState()
+}
+
+sealed class MetadataState {
+    data object Idle : MetadataState()
+    data class Running(val current: Int, val total: Int) : MetadataState()
+    data class Done(val updated: Int) : MetadataState()
 }

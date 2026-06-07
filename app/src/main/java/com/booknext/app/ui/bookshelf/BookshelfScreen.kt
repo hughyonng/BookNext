@@ -9,8 +9,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -61,6 +63,7 @@ fun BookshelfScreen(
     val books by viewModel.books.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val metadataState by viewModel.metadataState.collectAsState()
 
     val context = LocalContext.current
     val prefs = remember {
@@ -80,6 +83,9 @@ fun BookshelfScreen(
     var showFolderSheet by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+
+    var showMetadataDialog by remember { mutableStateOf(false) }
+    var metadataApiKey by remember { mutableStateOf("") }
 
     var coverTargetBookId by remember { mutableStateOf<String?>(null) }
     var showCoverPickerDialog by remember { mutableStateOf(false) }
@@ -250,6 +256,14 @@ fun BookshelfScreen(
                                 },
                                 leadingIcon = { Icon(Icons.Default.SelectAll, null) },
                             )
+                            DropdownMenuItem(
+                                text = { Text("补全书籍信息") },
+                                onClick = {
+                                    showMenu = false
+                                    showMetadataDialog = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.CloudDownload, null) },
+                            )
                         }
                     }
                 },
@@ -272,33 +286,53 @@ fun BookshelfScreen(
                 }
                 else -> {
                     Column(Modifier.fillMaxSize()) {
-                        LazyVerticalGrid(
-                            columns = columns,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            items(sortedBooks, key = { it.bookId }) { book ->
-                                val isSelected = selectedBooks.contains(book.bookId)
-                                BookCard(
-                                    book = book,
-                                    baseUrl = baseUrl,
-                                    apiKey = apiKey,
-                                    isSelected = isSelected,
-                                    onClick = {
-                                        if (selectedBooks.isNotEmpty()) {
-                                            selectedBooks = if (isSelected)
-                                                selectedBooks - book.bookId
-                                            else
-                                                selectedBooks + book.bookId
-                                        } else {
-                                            onBookClick(book)
-                                        }
-                                    },
-                                    onLongClick = {
-                                        selectedBooks = selectedBooks + book.bookId
-                                    },
-                                )
+                        if (layoutMode == LayoutMode.LIST) {
+                            LazyColumn(
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                val list = sortedBooks
+                                items(list.size) { index ->
+                                    val book = list[index]
+                                    val isSelected = selectedBooks.contains(book.bookId)
+                                    ListBookRow(
+                                        book = book,
+                                        baseUrl = baseUrl,
+                                        apiKey = apiKey,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            if (selectedBooks.isNotEmpty()) {
+                                                selectedBooks = if (isSelected) selectedBooks - book.bookId
+                                                else selectedBooks + book.bookId
+                                            } else onBookClick(book)
+                                        },
+                                        onLongClick = { selectedBooks = selectedBooks + book.bookId },
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                columns = columns,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                items(sortedBooks, key = { it.bookId }) { book ->
+                                    val isSelected = selectedBooks.contains(book.bookId)
+                                    BookCard(
+                                        book = book,
+                                        baseUrl = baseUrl,
+                                        apiKey = apiKey,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            if (selectedBooks.isNotEmpty()) {
+                                                selectedBooks = if (isSelected) selectedBooks - book.bookId
+                                                else selectedBooks + book.bookId
+                                            } else onBookClick(book)
+                                        },
+                                        onLongClick = { selectedBooks = selectedBooks + book.bookId },
+                                    )
+                                }
                             }
                         }
                     }
@@ -307,6 +341,19 @@ fun BookshelfScreen(
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
                     }
+                }
+            }
+
+            if (metadataState is MetadataState.Running) {
+                val m = metadataState as MetadataState.Running
+                Column(
+                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(2.dp))
+                    Text("补全中：${m.current}/${m.total}",
+                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -550,6 +597,68 @@ fun BookshelfScreen(
             }
         )
     }
+
+    if (showMetadataDialog) {
+        val isRunning = metadataState is MetadataState.Running
+        val savedKey = prefs.googleBooksApiKey.collectAsState(initial = "")
+        LaunchedEffect(showMetadataDialog) { metadataApiKey = savedKey.value }
+
+        AlertDialog(
+            onDismissRequest = { if (!isRunning) { showMetadataDialog = false; viewModel.resetMetadataState() } },
+            title = { Text("补全书籍信息") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("从 Google Books API 自动补全作者、封面等信息",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (metadataState is MetadataState.Idle || metadataState is MetadataState.Done) {
+                        OutlinedTextField(
+                            value = metadataApiKey,
+                            onValueChange = { metadataApiKey = it },
+                            label = { Text("Google Books API 密钥") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = !isRunning,
+                        )
+                    }
+                    when (val ms = metadataState) {
+                        is MetadataState.Running -> {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Text("补全中 ${ms.current}/${ms.total}...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        is MetadataState.Done -> {
+                            Text("✅ 已完成，共更新 ${ms.updated} 本书籍信息",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                        else -> {}
+                    }
+                }
+            },
+            confirmButton = {
+                when (metadataState) {
+                    is MetadataState.Idle -> TextButton(onClick = {
+                        val key = metadataApiKey.trim()
+                        if (key.isNotEmpty()) {
+                            viewModel.autoFillMetadata(key)
+                        }
+                    }, enabled = metadataApiKey.trim().isNotEmpty()) { Text("开始补全") }
+                    is MetadataState.Running -> {}
+                    is MetadataState.Done -> TextButton(onClick = {
+                        showMetadataDialog = false; viewModel.resetMetadataState()
+                    }) { Text("完成") }
+                    else -> {}
+                }
+            },
+            dismissButton = {
+                if (metadataState !is MetadataState.Running) {
+                    TextButton(onClick = { showMetadataDialog = false; viewModel.resetMetadataState() }) { Text("取消") }
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -575,9 +684,9 @@ fun BookCard(
                 else
                     Modifier.fillMaxWidth().aspectRatio(0.68f),
                 elevation = CardDefaults.cardElevation(
-                    defaultElevation = if (isSelected) 6.dp else 2.dp
+                    defaultElevation = if (isSelected) 8.dp else 3.dp
                 ),
-                shape = MaterialTheme.shapes.small,
+                shape = RoundedCornerShape(10.dp),
                 border = if (isSelected)
                     BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                 else null,
@@ -647,6 +756,76 @@ fun BookCard(
         }
 
         Spacer(Modifier.height(5.dp))
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ListBookRow(
+    book: BookEntity,
+    baseUrl: String,
+    apiKey: String,
+    isSelected: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Card(
+            modifier = Modifier.size(width = 44.dp, height = 60.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            shape = RoundedCornerShape(6.dp),
+        ) {
+            if (book.coverPath != null) {
+                AsyncImage(model = File(book.coverPath), contentDescription = book.title,
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else if (book.hasCover) {
+                AsyncImage(model = "$baseUrl/api/cover/${book.bookId}?k=$apiKey",
+                    contentDescription = book.title, contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize())
+            } else {
+                val bgColor = when (book.format.lowercase()) {
+                    "epub" -> Color(0xFF1565C0); "pdf" -> Color(0xFFC62828)
+                    "txt" -> Color(0xFF2E7D32); "mobi", "azw3" -> Color(0xFF6A1B9A)
+                    else -> Color(0xFF37474F)
+                }
+                Box(Modifier.fillMaxSize().background(bgColor), contentAlignment = Alignment.Center) {
+                    Text(book.format.uppercase(), color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(book.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val author = if (book.author.isNotEmpty() && book.author != "未知") book.author else ""
+                if (author.isNotEmpty()) {
+                    Text(author, fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (book.readingPercent > 0f) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LinearProgressIndicator(
+                        progress = { book.readingPercent },
+                        modifier = Modifier.height(3.dp).width(60.dp),
+                    )
+                    Text("${(book.readingPercent * 100).toInt()}%",
+                        fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (isSelected) {
+            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
