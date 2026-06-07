@@ -678,7 +678,7 @@ fun BookshelfScreen(
         }
 
         AlertDialog(
-            onDismissRequest = { if (!isRunning) { showMetadataDialog = false; viewModel.resetMetadataState() } },
+            onDismissRequest = { showMetadataDialog = false },
             title = { Text("补全书籍信息") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -702,15 +702,21 @@ fun BookshelfScreen(
             },
             confirmButton = {
                 when (metadataState) {
-                    is MetadataState.Idle -> TextButton(onClick = { val key = metadataApiKey.trim(); if (key.isNotEmpty()) { viewModel.autoFillMetadata(key); showMetadataDialog = false } },
-                        enabled = metadataApiKey.trim().isNotEmpty()) { Text("后台补全") }
+                    is MetadataState.Idle -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { val key = metadataApiKey.trim(); if (key.isNotEmpty()) viewModel.autoFillMetadata(key) },
+                            enabled = metadataApiKey.trim().isNotEmpty()) { Text("开始补全") }
+                        TextButton(onClick = { val key = metadataApiKey.trim(); if (key.isNotEmpty()) { viewModel.autoFillMetadata(key); showMetadataDialog = false } },
+                            enabled = metadataApiKey.trim().isNotEmpty()) { Text("后台补全") }
+                    }
                     is MetadataState.Running -> {}
                     is MetadataState.Done -> TextButton(onClick = { showMetadataDialog = false; viewModel.resetMetadataState() }) { Text("完成") }
                     else -> {}
                 }
             },
             dismissButton = {
-                if (metadataState !is MetadataState.Running) {
+                if (metadataState is MetadataState.Running) {
+                    TextButton(onClick = { showMetadataDialog = false }) { Text("最小化") }
+                } else {
                     TextButton(onClick = { showMetadataDialog = false; viewModel.resetMetadataState() }) { Text("取消") }
                 }
             },
