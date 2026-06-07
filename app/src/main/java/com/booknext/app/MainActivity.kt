@@ -8,17 +8,19 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.fragment.app.FragmentActivity
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import com.booknext.app.data.local.prefs.UserPreferences
 import com.booknext.app.ui.bookshelf.BookshelfScreen
 import com.booknext.app.ui.category.CategoryScreen
 import com.booknext.app.ui.cloud.CloudScreen
 import com.booknext.app.ui.common.BookNextTheme
+import com.booknext.app.ui.common.LocalAppTheme
 import com.booknext.app.ui.drawer.DrawerContent
 import com.booknext.app.ui.drawer.DrawerPage
 import com.booknext.app.ui.local.LocalScreen
@@ -50,6 +52,8 @@ class MainActivity : FragmentActivity() {
             val uiFontScale by prefs.uiFontScale.collectAsState(initial = 1.0f)
             val uiFontFamily by prefs.uiFontFamily.collectAsState(initial = "sans-serif")
             val uiLineSpacing by prefs.uiLineSpacing.collectAsState(initial = 1.5f)
+            val blueLight by prefs.blueLight.collectAsState(initial = false)
+            val blueLightAmount by prefs.blueLightAmount.collectAsState(initial = 0.3f)
             val serverUrl by prefs.serverUrl.collectAsState(initial = "")
             val scope = rememberCoroutineScope()
 
@@ -103,6 +107,8 @@ class MainActivity : FragmentActivity() {
                                     recreate()
                                 }
                             },
+                            blueLight = blueLight,
+                            blueLightAmount = blueLightAmount,
                         )
                     }
                 }
@@ -120,6 +126,8 @@ fun MainDrawerScaffold(
     isDarkMode: Boolean,
     onDarkModeToggle: () -> Unit,
     onLogout: () -> Unit,
+    blueLight: Boolean = false,
+    blueLightAmount: Float = 0.3f,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -185,72 +193,85 @@ fun MainDrawerScaffold(
         return
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            DrawerContent(
-                currentPage = currentPage,
-                serverUrl = serverUrl,
-                isLoggedIn = isLoggedIn,
-                onLoginClick = {
-                    scope.launch { drawerState.close() }
-                    onLoginRequest()
-                },
-                onPageSelect = { page ->
-                    currentPage = page
-                    scope.launch { drawerState.close() }
-                },
-                onSettingsClick = {
-                    scope.launch { drawerState.close() }
-                    showSettings = true
-                },
-                onDarkModeToggle = onDarkModeToggle,
-                isDarkMode = isDarkMode,
-                onLogout = onLogout,
-            )
-        },
-    ) {
-        AnimatedContent(
-            targetState = currentPage,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "page_switch",
-        ) { page ->
-            when (page) {
-                DrawerPage.RECENT -> RecentScreen(
-                    onBookClick = { readerBookId = it },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    onNavigateToNotes = { showQuotes = true },
-                    onNavigateToStats = { showStats = true },
-                    onNavigateToFavorites = {
-                        currentPage = DrawerPage.BOOKSHELF
-                        showFavoritesOnly = true
+    val currentThemeId = LocalAppTheme.current.id
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DrawerContent(
+                    currentPage = currentPage,
+                    serverUrl = serverUrl,
+                    isLoggedIn = isLoggedIn,
+                    onLoginClick = {
+                        scope.launch { drawerState.close() }
+                        onLoginRequest()
                     },
-                    onNavigateToBookmarks = { showBookmarks = true },
+                    onPageSelect = { page ->
+                        currentPage = page
+                        scope.launch { drawerState.close() }
+                    },
+                    onSettingsClick = {
+                        scope.launch { drawerState.close() }
+                        showSettings = true
+                    },
+                    onDarkModeToggle = onDarkModeToggle,
+                    isDarkMode = isDarkMode,
+                    onLogout = onLogout,
                 )
-                DrawerPage.BOOKSHELF -> BookshelfScreen(
-                    onBookClick = { readerBookId = it.bookId },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    onUploadClick = { currentPage = DrawerPage.CLOUD },
-                    showFavoritesOnly = showFavoritesOnly,
-                    onFavoritesFilterCleared = { showFavoritesOnly = false },
-                )
-                DrawerPage.CATEGORY -> CategoryScreen(
-                    onBookClick = { readerBookId = it },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                )
-                DrawerPage.LOCAL -> LocalScreen(
-                    onBookClick = { readerBookId = it },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                )
-                DrawerPage.CLOUD -> CloudScreen(
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    onBookClick = { readerBookId = it },
-                )
-                DrawerPage.ONLINE_LIBRARY -> OnlineLibraryScreen(
-                    onBack = { currentPage = DrawerPage.RECENT },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                )
+            },
+        ) {
+            AnimatedContent(
+                targetState = "${currentPage.name}-$currentThemeId",
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "page_switch",
+            ) { key ->
+                val page = DrawerPage.valueOf(key.substringBefore("-"))
+                when (page) {
+                    DrawerPage.RECENT -> RecentScreen(
+                        onBookClick = { readerBookId = it },
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onNavigateToNotes = { showQuotes = true },
+                        onNavigateToStats = { showStats = true },
+                        onNavigateToFavorites = {
+                            currentPage = DrawerPage.BOOKSHELF
+                            showFavoritesOnly = true
+                        },
+                        onNavigateToBookmarks = { showBookmarks = true },
+                    )
+                    DrawerPage.BOOKSHELF -> BookshelfScreen(
+                        onBookClick = { readerBookId = it.bookId },
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onUploadClick = { currentPage = DrawerPage.CLOUD },
+                        showFavoritesOnly = showFavoritesOnly,
+                        onFavoritesFilterCleared = { showFavoritesOnly = false },
+                    )
+                    DrawerPage.CATEGORY -> CategoryScreen(
+                        onBookClick = { readerBookId = it },
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                    )
+                    DrawerPage.LOCAL -> LocalScreen(
+                        onBookClick = { readerBookId = it },
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                    )
+                    DrawerPage.CLOUD -> CloudScreen(
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onBookClick = { readerBookId = it },
+                    )
+                    DrawerPage.ONLINE_LIBRARY -> OnlineLibraryScreen(
+                        onBack = { currentPage = DrawerPage.RECENT },
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                    )
+                }
             }
+        }
+
+        if (blueLight) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(1f, 0.7f, 0.4f, (blueLightAmount * 0.2f).coerceIn(0f, 0.4f)))
+            )
         }
     }
 }

@@ -17,7 +17,7 @@ import javax.inject.Inject
 data class SettingsState(
     val serverUrl: String = "",
     val apiKey: String = "",
-    val darkMode: Boolean = false,
+    val eyeComfort: Boolean = false,
     val uiFontScale: Float = 1.0f,
     val uiFontFamily: String = "sans-serif",
     val uiLineSpacing: Float = 1.5f,
@@ -39,7 +39,7 @@ class SettingsViewModel @Inject constructor(
             _state.value = SettingsState(
                 serverUrl = prefs.serverUrl.first(),
                 apiKey = prefs.apiKey.first(),
-                darkMode = prefs.darkMode.first(),
+                eyeComfort = prefs.blueLight.first(),
                 uiFontScale = prefs.uiFontScale.first(),
                 uiFontFamily = prefs.uiFontFamily.first(),
                 uiLineSpacing = prefs.uiLineSpacing.first(),
@@ -77,9 +77,12 @@ class SettingsViewModel @Inject constructor(
 
     fun onUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v) }
     fun onKeyChange(v: String) { _state.value = _state.value.copy(apiKey = v) }
-    fun onDarkModeChange(v: Boolean) {
-        _state.value = _state.value.copy(darkMode = v)
-        viewModelScope.launch { prefs.saveDarkMode(v) }
+    fun onEyeComfortChange(v: Boolean) {
+        _state.value = _state.value.copy(eyeComfort = v)
+        viewModelScope.launch {
+            prefs.saveBlueLight(v)
+            if (v) prefs.saveBlueLightAmount(0.3f)
+        }
     }
     fun onUiFontScaleChange(v: Float) {
         _state.value = _state.value.copy(uiFontScale = v)
@@ -102,8 +105,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val s = _state.value
             prefs.saveCredentials(s.serverUrl.trimEnd('/'), s.apiKey.trim())
-            prefs.saveDarkMode(s.darkMode)
-            prefs.saveThemeId(s.themeId)
         }
     }
 

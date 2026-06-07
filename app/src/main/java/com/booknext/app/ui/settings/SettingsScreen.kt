@@ -175,8 +175,8 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(
-                    checked = state.darkMode,
-                    onCheckedChange = viewModel::onDarkModeChange,
+                    checked = state.eyeComfort,
+                    onCheckedChange = viewModel::onEyeComfortChange,
                 )
             }
 
