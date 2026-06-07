@@ -89,6 +89,11 @@ fun CloudScreen(
         }
     }
 
+    // 登录后自动加载云盘数据
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) viewModel.load()
+    }
+
     if (!isLoggedIn) {
         Scaffold(
             topBar = {

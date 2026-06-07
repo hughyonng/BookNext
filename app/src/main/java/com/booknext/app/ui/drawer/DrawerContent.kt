@@ -38,7 +38,10 @@ fun DrawerContent(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.fillMaxHeight().width(300.dp),
+        modifier = modifier
+            .fillMaxHeight()
+            .width(300.dp)
+            .navigationBarsPadding(),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -110,7 +113,10 @@ fun DrawerContent(
                 onClick = onDarkModeToggle,
             )
             if (isLoggedIn) {
-                NavIconButton(Icons.Default.CheckCircle, "已登录", onClick = {})
+                NavIconButton(Icons.Default.CheckCircle, "已登录", onClick = {},
+                    tint = Color(0xFF4CAF50))
+            } else {
+                NavIconButton(Icons.Default.AccountCircle, "未登录", onClick = {})
             }
             NavIconButton(Icons.AutoMirrored.Filled.ExitToApp, "退出", onClick = onLogout,
                 tint = MaterialTheme.colorScheme.error)
@@ -127,7 +133,7 @@ fun DrawerContent(
                 Text("登录")
             }
         }
-        Spacer(Modifier.height(16.dp).navigationBarsPadding())
+        Spacer(Modifier.height(16.dp))
     }
     }
 }

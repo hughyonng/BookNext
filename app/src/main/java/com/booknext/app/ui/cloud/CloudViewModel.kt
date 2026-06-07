@@ -65,7 +65,9 @@ class CloudViewModel @Inject constructor(
     private val _transfers = MutableStateFlow<List<TransferItem>>(emptyList())
     val transfers: StateFlow<List<TransferItem>> = _transfers
 
-    init { load() }
+    init {
+        // 不自动加载,由 CloudScreen 控制——登录后才触发 load()
+    }
 
     fun load() {
         viewModelScope.launch {
