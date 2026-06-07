@@ -55,13 +55,12 @@ class MainActivity : FragmentActivity() {
             val blueLight by prefs.blueLight.collectAsState(initial = false)
             val blueLightAmount by prefs.blueLightAmount.collectAsState(initial = 0.3f)
             val serverUrl by prefs.serverUrl.collectAsState(initial = "")
+            val apiKey by prefs.apiKey.collectAsState(initial = "")
+            val isLoggedIn = remember(serverUrl, apiKey) { serverUrl.isNotBlank() && apiKey.isNotBlank() }
             val scope = rememberCoroutineScope()
 
             var appState by remember { mutableStateOf(AppState.WELCOME) }
-            var isLoggedIn by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
-                isLoggedIn = prefs.serverUrl.first().isNotEmpty() &&
-                             prefs.apiKey.first().isNotEmpty()
                 val hasSeenWelcome = prefs.hasSeenWelcome.first()
                 appState = when {
                     isLoggedIn -> AppState.MAIN
