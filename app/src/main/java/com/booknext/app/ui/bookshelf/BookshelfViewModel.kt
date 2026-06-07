@@ -203,12 +203,13 @@ class BookshelfViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             prefs.saveGoogleBooksApiKey(apiKey)
             val allBooks = bookDao.observeAll().first()
-            val needsFill = allBooks.filter {
-                it.author.isNullOrEmpty() || it.author == "未知"
+            val needsFill = allBooks.filter { book ->
+                val a = book.author
+                a.isNullOrBlank() || a.trim() == "未知" || a.trim() == "佚名" || a.trim().equals("unknown", true) || a.length > 50
             }
             val total = needsFill.size
             if (total == 0) {
-                _metadataState.value = MetadataState.Idle
+                _metadataState.value = MetadataState.Done(0)
                 return@launch
             }
             var updated = 0

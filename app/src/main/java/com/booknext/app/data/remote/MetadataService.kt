@@ -24,12 +24,9 @@ class MetadataService {
 
     suspend fun lookup(title: String, apiKey: String): BookMetadata? = withContext(Dispatchers.IO) {
         try {
-            // 清理标题：去掉文件扩展名和截断
-            val cleanTitle = title
-                .replace(Regex("\\.(epub|pdf|txt|mobi|azw3)$", RegexOption.IGNORE_CASE), "")
-                .take(60)
-            val encoded = URLEncoder.encode(cleanTitle, "UTF-8")
-            val url = "https://www.googleapis.com/books/v1/volumes?q=intitle:$encoded&maxResults=3&key=$apiKey"
+            val clean = cleanTitle(title)
+            val encoded = URLEncoder.encode(clean, "UTF-8")
+            val url = "https://www.googleapis.com/books/v1/volumes?q=intitle:$encoded&maxResults=5&key=$apiKey"
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val body = response.body?.string() ?: return@withContext null
@@ -37,21 +34,25 @@ class MetadataService {
             val items = json.optJSONArray("items") ?: return@withContext null
             if (items.length() == 0) return@withContext null
 
-            // 取第一个有作者的结果
             var best: JSONObject? = null
+            var bestScore = -1
             for (i in 0 until items.length()) {
-                val item = items.getJSONObject(i)
-                val info = item.optJSONObject("volumeInfo")
-                if (info != null && info.optJSONArray("authors") != null && info.optJSONArray("authors")!!.length() > 0) {
-                    best = info
-                    break
+                val info = items.getJSONObject(i).optJSONObject("volumeInfo") ?: continue
+                val hasAuthor = info.optJSONArray("authors")?.length() ?: 0 > 0
+                val t = info.optString("title", "")
+                val score = when {
+                    hasAuthor && t.contains(clean, ignoreCase = true) -> 3
+                    hasAuthor -> 2
+                    t.contains(clean, ignoreCase = true) -> 1
+                    else -> 0
                 }
+                if (score >= 3) { best = info; break }
+                if (score > bestScore) { bestScore = score; best = info }
             }
-            if (best == null) {
+            if (best == null && items.length() > 0) {
                 best = items.getJSONObject(0).optJSONObject("volumeInfo")
-                if (best == null) return@withContext null
             }
-            val info = best!!
+            val info = best ?: return@withContext null
 
             val authors = mutableListOf<String>()
             val authorsArr = info.optJSONArray("authors")
@@ -59,15 +60,13 @@ class MetadataService {
                 for (i in 0 until authorsArr.length()) authors.add(authorsArr.getString(i))
             }
 
-            val publisher = info.optString("publisher", "")
-            val description = info.optString("description", "")
             val coverUrl = info.optJSONObject("imageLinks")?.optString("thumbnail")
                 ?.replace("http://", "https://")
 
             BookMetadata(
                 authors = authors,
-                publisher = publisher,
-                description = description,
+                publisher = info.optString("publisher", ""),
+                description = info.optString("description", ""),
                 coverUrl = coverUrl,
             )
         } catch (_: Exception) { null }
@@ -81,5 +80,20 @@ class MetadataService {
             val bytes = body.bytes()
             if (bytes.isEmpty()) null else bytes
         } catch (_: Exception) { null }
+    }
+
+    private fun cleanTitle(raw: String): String {
+        var t = raw.trim()
+        // 去掉文件扩展名
+        t = t.replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        // 去掉开头结尾的非中文/字母数字
+        t = t.replace(Regex("^[^\\u4e00-\\u9fff\\w]+|[^\\u4e00-\\u9fff\\w]+$"), "")
+        // 去掉括号内容（如 (简体) / [精校] / 第x卷）
+        t = t.replace(Regex("[（(\\[].{0,20}[）)\\]]"), "")
+        // 去掉常见的文件卷标
+        t = t.replace(Regex("(第[一二三四五六七八九十百千万]+[卷部集册章])"), "")
+        t = t.trim().take(60)
+        if (t.length < 2) return raw.take(60)
+        return t
     }
 }
