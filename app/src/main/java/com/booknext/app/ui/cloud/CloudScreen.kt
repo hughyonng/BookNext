@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.ui.bookshelf.PrefsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -69,6 +70,8 @@ fun CloudScreen(
 
     val isFolderMode = selectedFolder == null
     val hasSelection = selectedBooks.isNotEmpty() || selectedFolders.isNotEmpty()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackScope = rememberCoroutineScope()
 
     val folderNames = remember(state) {
         (state as? CloudUiState.Ready)?.folders?.map { it.name }?.filter { it != "__root__" } ?: emptyList()
@@ -105,7 +108,9 @@ fun CloudScreen(
                         IconButton(onClick = {
                             val s = state as? CloudUiState.Ready ?: return@IconButton
                             val all = s.folders.flatMap { it.books }
-                            viewModel.downloadBooks(context, all.filter { it.bookId in selectedBooks }, baseUrl, apiKey)
+                            val books = all.filter { it.bookId in selectedBooks }
+                            viewModel.downloadBooks(context, books, baseUrl, apiKey)
+                            snackScope.launch { snackbarHostState.showSnackbar("已加入传输队列 (${books.size} 项)") }
                         }) {
                             Icon(Icons.Default.Download, "下载")
                         }
@@ -126,7 +131,9 @@ fun CloudScreen(
                             val s = state as? CloudUiState.Ready ?: return@IconButton
                             val ids = if (isFolderMode) s.folders.flatMap { it.books }.map { it.bookId }.toSet()
                             else selectedFolder?.books?.map { it.bookId }?.toSet() ?: emptySet()
-                            viewModel.downloadBooks(context, s.folders.flatMap { it.books }.filter { it.bookId in ids }, baseUrl, apiKey)
+                            val books = s.folders.flatMap { it.books }.filter { it.bookId in ids }
+                            viewModel.downloadBooks(context, books, baseUrl, apiKey)
+                            snackScope.launch { snackbarHostState.showSnackbar("已加入传输队列 (${books.size} 项)") }
                         }) {
                             Icon(Icons.Default.Download, "下载")
                         }
@@ -178,7 +185,8 @@ fun CloudScreen(
                     }
                 },
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
@@ -414,6 +422,7 @@ private fun TransferItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(vertical = 3.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(8.dp),

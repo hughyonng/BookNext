@@ -19,6 +19,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class CloudFolder(
@@ -180,7 +181,10 @@ class CloudViewModel @Inject constructor(
     fun downloadBooks(context: Context, books: List<BookEntity>, baseUrl: String, apiKey: String) {
         val localDir = File(context.filesDir, "local_books")
         localDir.mkdirs()
-        val client = OkHttpClient()
+        val client = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .build()
 
         books.forEach { book ->
             val ext = book.format.ifEmpty { "epub" }
@@ -197,7 +201,9 @@ class CloudViewModel @Inject constructor(
                         updateTransfer(transferId) { it.copy(status = TransferStatus.SUCCESS, transferredBytes = book.fileSize) }
                         return@launch
                     }
-                    val request = okhttp3.Request.Builder().url(url).build()
+                    val request = okhttp3.Request.Builder().url(url)
+                        .addHeader("Authorization", "Bearer $apiKey")
+                        .build()
                     val response = client.newCall(request).execute()
                     if (!response.isSuccessful) {
                         updateTransfer(transferId) { it.copy(status = TransferStatus.ERROR, errorMessage = "HTTP ${response.code}") }
@@ -212,7 +218,7 @@ class CloudViewModel @Inject constructor(
                     var transferred = 0L
                     body.byteStream().use { input ->
                         destFile.outputStream().use { output ->
-                            val buf = ByteArray(8192)
+                            val buf = ByteArray(65536) // 64KB buffer for faster download
                             var read: Int
                             while (input.read(buf).also { read = it } != -1) {
                                 output.write(buf, 0, read)
