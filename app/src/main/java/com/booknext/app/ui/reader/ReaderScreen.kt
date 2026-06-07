@@ -133,6 +133,7 @@ fun ReaderScreen(
                     when (key) {
                         "showStatusBar" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(showStatusBar = value))
                         "showNavBar" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(showNavBar = value))
+                        "showProgressBar" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(showProgressBar = value))
                         "keepScreenOn" -> if (value is Boolean) viewModel.saveOtherOptions(readerOtherOptions.copy(keepScreenOn = value))
                         "screenOrientation" -> if (value is String) { viewModel.setScreenOrientation(value); applyOrientation(activity, value) }
                     }
@@ -313,6 +314,7 @@ fun ReaderScreen(
                             readerBgColor = readerBgColor,
                             showStatusBar = readerOtherOptions.showStatusBar,
                             showNavBar = readerOtherOptions.showNavBar,
+                            showProgressBar = readerOtherOptions.showProgressBar,
                         )
                         "md" -> TxtReaderScreen(
                             file = s.file,
@@ -374,6 +376,7 @@ fun ReaderScreen(
                             readerBgColor = readerBgColor,
                             showStatusBar = readerOtherOptions.showStatusBar,
                             showNavBar = readerOtherOptions.showNavBar,
+                            showProgressBar = readerOtherOptions.showProgressBar,
                         )
                         "pdf" -> PdfReaderScreen(
                             file = s.file,
