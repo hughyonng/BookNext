@@ -156,7 +156,7 @@ fun ReaderToolbarOverlay(
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(top = if (state.showStatusBar) 0.dp else 8.dp)
-                        .height(56.dp)
+                        .height(64.dp)
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
