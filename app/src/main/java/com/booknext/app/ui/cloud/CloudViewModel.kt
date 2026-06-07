@@ -131,7 +131,7 @@ class CloudViewModel @Inject constructor(
             val client = OkHttpClient()
             books.forEach { book ->
                 try {
-                    val url = "${baseUrl}/api/books/${book.bookId}/download?k=$apiKey"
+                    val url = "${baseUrl}/api/stream/${book.bookId}?k=$apiKey"
                     val ext = book.format.ifEmpty { "epub" }
                     val safeName = book.title.replace(Regex("[/\\\\:*?\"<>|]"), "_")
                     val destFile = File(localDir, "$safeName.$ext")

@@ -60,7 +60,14 @@ fun CloudScreen(
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { uploadViewModel.onFileSelected(context, it) } }
+    ) { uri ->
+        if (uri != null) {
+            uploadViewModel.onFileSelected(context, uri)
+            uploadViewModel.upload(context) {
+                viewModel.load()
+            }
+        }
+    }
 
     val isFolderMode = selectedFolder == null
     val hasSelection = selectedBooks.isNotEmpty() || selectedFolders.isNotEmpty()
