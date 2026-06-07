@@ -2,6 +2,7 @@ package com.booknext.app.ui.reader
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -34,13 +35,27 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
+import com.booknext.app.data.local.db.BookDao
 import com.booknext.app.data.local.db.BookEntity
 import com.booknext.app.data.local.db.ReadingSessionEntity
 import com.booknext.app.ui.reader.options.VisualOptions
 import com.booknext.app.ui.reader.options.VisualOptionsSheet
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 data class TocEntry(val title: String, val index: Int)
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface BookDaoEntryPoint {
+    fun bookDao(): BookDao
+}
 
 data class ReaderToolbarState(
     val title: String = "",
@@ -103,6 +118,7 @@ fun ReaderToolbarOverlay(
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val captureScope = rememberCoroutineScope()
 
     val surfaceColor = MaterialTheme.colorScheme.surface
     val defaultDarkToolbar = Color(android.graphics.Color.parseColor("#1E2428")).copy(alpha = 0.92f)
@@ -194,6 +210,7 @@ fun ReaderToolbarOverlay(
                                 "阅读设置" to "ReadingSettings",
                                 "词典" to "Dictionary",
                                 "翻译设置" to "TranslateSettings",
+                                "设为封面" to "SetCover",
                             ).forEach { (label, action) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
@@ -208,6 +225,32 @@ fun ReaderToolbarOverlay(
                                             "ReadingSettings" -> showReadingSettings = true
                                             "Dictionary" -> onDictionaryLookup()
                                             "TranslateSettings" -> showTranslateSettings = true
+                                            "SetCover" -> {
+                                                val b = book ?: return@DropdownMenuItem
+                                                val ctx = context
+                                                captureScope.launch(Dispatchers.IO) {
+                                                    try {
+                                                        val activity = ctx as? Activity
+                                                        val root = activity?.window?.decorView?.rootView ?: return@launch
+                                                        val w = root.width
+                                                        val h = root.height
+                                                        if (w <= 0 || h <= 0) return@launch
+                                                        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                                        val canvas = android.graphics.Canvas(bitmap)
+                                                        root.draw(canvas)
+                                                        val dir = File(ctx.filesDir, "covers")
+                                                        dir.mkdirs()
+                                                        val coverFile = File(dir, "${b.bookId}.jpg")
+                                                        FileOutputStream(coverFile).use { out ->
+                                                            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                                                        }
+                                                        bitmap.recycle()
+                                                        val entryPoint = EntryPointAccessors.fromApplication(ctx.applicationContext, BookDaoEntryPoint::class.java)
+                                                        entryPoint.bookDao().updateCoverPath(b.bookId, coverFile.absolutePath)
+                                                        android.widget.Toast.makeText(ctx, "已设为封面", android.widget.Toast.LENGTH_SHORT).show()
+                                                    } catch (_: Exception) { }
+                                                }
+                                            }
                                         }
                                     }
                                 )
