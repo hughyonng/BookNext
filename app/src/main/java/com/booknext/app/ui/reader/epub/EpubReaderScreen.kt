@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.webkit.WebView
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -50,7 +51,6 @@ private var epubNavigatorRef: EpubNavigatorFragment? = null
 private var epubPublicationRef: org.readium.r2.shared.publication.Publication? = null
 private var epubSearchIndex: List<Pair<Int, String>>? = null
 private var epubPendingHighlight: String = ""
-private var epubPendingBgColor: String = ""
 
 private fun buildEpubSpannable(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder(text)
@@ -124,9 +124,12 @@ fun EpubReaderScreen(
     var showEpubBackToResults by remember { mutableStateOf(false) }
     var epubHighlightQuery by remember { mutableStateOf("") }
     var epubHighlightChapter by remember { mutableIntStateOf(-1) }
-    // 监听背景色变化，触发轮询线程 JS 注入
-    LaunchedEffect(readerBgColor) {
-        epubPendingBgColor = readerBgColor
+    // 覆盖层颜色
+    val overlayColor = remember(readerBgColor, darkMode) {
+        if (darkMode || readerBgColor.isBlank()) null
+        else try {
+            Color(android.graphics.Color.parseColor(readerBgColor)).copy(alpha = 0.30f)
+        } catch (_: Exception) { null }
     }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
@@ -154,6 +157,14 @@ fun EpubReaderScreen(
     },
     modifier = Modifier.fillMaxSize(),
         )
+        }
+        // 背景色覆盖层（非深色模式、有自定义背景时叠加）
+        if (overlayColor != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(overlayColor),
+            )
         }
         ReaderToolbarOverlay(
             state = ReaderToolbarState(
@@ -540,7 +551,7 @@ private suspend fun openEpubPublication(
             "monospace" -> org.readium.r2.navigator.preferences.FontFamily.MONOSPACE
             else -> org.readium.r2.navigator.preferences.FontFamily.SERIF
         },
-        theme = if (readerBgColor.isNotBlank() && readerBgColor != "#1A1814") Theme.LIGHT else if (darkMode) Theme.DARK else Theme.LIGHT,
+        theme = if (darkMode) Theme.DARK else Theme.LIGHT,
         scroll = true,
         publisherStyles = false,
     )
@@ -680,9 +691,6 @@ private suspend fun openEpubPublication(
             var lastSel = ""
             val pollRunnable = object : Runnable {
                 override fun run() {
-                    // 背景色注入（每轮都执行，翻页后新页面自动恢复背景）
-                    val bg = epubPendingBgColor
-                    wv.evaluateJavascript("document.body.style.backgroundColor='$bg';", null)
                     // 文字选择检测
                     wv.evaluateJavascript("(function(){return window.getSelection().toString();})()") { sel ->
                         val text = if (!sel.isNullOrEmpty() && sel != "\"\"") sel.removeSurrounding("\"") else ""
