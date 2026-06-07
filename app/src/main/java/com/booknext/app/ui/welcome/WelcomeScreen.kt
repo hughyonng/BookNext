@@ -63,7 +63,7 @@ fun WelcomeScreen(
             onClick = onEnterLocal,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Text("先本地使用", fontSize = 16.sp)
+            Text("离线模式", fontSize = 16.sp)
         }
 
         Spacer(Modifier.height(32.dp))

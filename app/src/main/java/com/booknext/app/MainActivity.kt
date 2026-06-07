@@ -94,7 +94,7 @@ class MainActivity : FragmentActivity() {
                             onBack = { appState = AppState.WELCOME },
                         )
                         AppState.MAIN -> MainDrawerScaffold(
-                            isLoggedIn = isLoggedIn || appState != AppState.WELCOME,
+                            isLoggedIn = isLoggedIn,
                             onLoginRequest = { appState = AppState.LOGIN },
                             serverUrl = serverUrl,
                             isDarkMode = darkMode,
