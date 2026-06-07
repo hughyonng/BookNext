@@ -415,6 +415,7 @@ fun TxtReaderScreen(
             onTranslateText = onTranslateText,
             onDictionaryLookup = onDictionaryLookup,
             onSetReaderBgColor = onSetReaderBgColor,
+            readerBgColor = readerBgColor,
         )
 
         // 搜索结果覆盖层

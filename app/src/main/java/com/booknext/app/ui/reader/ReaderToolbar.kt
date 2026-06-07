@@ -95,10 +95,28 @@ fun ReaderToolbarOverlay(
     onTranslateText: () -> Unit = {},
     onDictionaryLookup: () -> Unit = {},
     onSetReaderBgColor: (String) -> Unit = {},
+    readerBgColor: String = "",
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val defaultDarkToolbar = Color(android.graphics.Color.parseColor("#2C2416")).copy(alpha = 0.92f)
+    // 工具栏背景色（跟随阅读背景）
+    val toolbarBg = remember(readerBgColor, state.darkMode, surfaceColor) {
+        if (readerBgColor.isNotBlank()) {
+            try {
+                Color(android.graphics.Color.parseColor(readerBgColor)).copy(alpha = 0.92f)
+            } catch (_: Exception) {
+                if (state.darkMode) defaultDarkToolbar else surfaceColor
+            }
+        } else if (state.darkMode) {
+            defaultDarkToolbar
+        } else {
+            surfaceColor
+        }
+    }
 
     var showToc by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
@@ -127,7 +145,7 @@ fun ReaderToolbarOverlay(
         ) {
             Surface(
                 tonalElevation = 4.dp,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                color = toolbarBg,
             ) {
                 Row(
                     modifier = Modifier
@@ -201,7 +219,7 @@ fun ReaderToolbarOverlay(
         ) {
             Surface(
                 tonalElevation = 4.dp,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                color = toolbarBg,
             ) {
                 Column(
                     modifier = Modifier
