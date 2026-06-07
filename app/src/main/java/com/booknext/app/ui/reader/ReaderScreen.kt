@@ -88,12 +88,12 @@ fun ReaderScreen(
         }
     }
 
-    // 状态栏/导航栏显示控制
+    // 状态栏/导航栏显示控制——离开阅读界面时恢复
     val showStatusBar = readerOtherOptions.showStatusBar
     val showNavBar = readerOtherOptions.showNavBar
-    LaunchedEffect(showStatusBar, showNavBar) {
-        val activity = context as? android.app.Activity ?: return@LaunchedEffect
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
+    DisposableEffect(showStatusBar, showNavBar) {
+        val activity = context as? android.app.Activity
+        if (activity != null && android.os.Build.VERSION.SDK_INT >= 30) {
             val controller = activity.window.insetsController
             if (controller != null) {
                 if (showStatusBar) controller.show(android.view.WindowInsets.Type.statusBars())
@@ -102,6 +102,17 @@ fun ReaderScreen(
                 else controller.hide(android.view.WindowInsets.Type.navigationBars())
                 if (!showStatusBar || !showNavBar) {
                     controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+        }
+        onDispose {
+            // 退出阅读器时恢复系统状态栏和导航栏
+            if (activity != null && android.os.Build.VERSION.SDK_INT >= 30) {
+                val ctrl = activity.window.insetsController
+                if (ctrl != null) {
+                    ctrl.show(android.view.WindowInsets.Type.statusBars())
+                    ctrl.show(android.view.WindowInsets.Type.navigationBars())
+                    ctrl.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_DEFAULT
                 }
             }
         }
