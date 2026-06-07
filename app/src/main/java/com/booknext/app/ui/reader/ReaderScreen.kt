@@ -211,6 +211,7 @@ fun ReaderScreen(
                             readerBgColor = readerBgColor,
                             showStatusBar = readerOtherOptions.showStatusBar,
                             showNavBar = readerOtherOptions.showNavBar,
+                            showProgressBar = readerOtherOptions.showProgressBar,
                         )
                         "txt", "mobi", "azw3" -> TxtReaderScreen(
                             file = s.file,
@@ -235,6 +236,7 @@ fun ReaderScreen(
                             readerBgColor = readerBgColor,
                             showStatusBar = readerOtherOptions.showStatusBar,
                             showNavBar = readerOtherOptions.showNavBar,
+                            showProgressBar = readerOtherOptions.showProgressBar,
                         )
                         "docx", "doc" -> TxtReaderScreen(
                             file = s.file,

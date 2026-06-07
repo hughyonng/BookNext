@@ -70,6 +70,7 @@ class UserPreferences @Inject constructor(
         // ── 其他选项 ─────────────────────────────────────
         private val SHOW_STATUS_BAR = booleanPreferencesKey("show_status_bar")
         private val SHOW_NAV_BAR = booleanPreferencesKey("show_nav_bar")
+        private val SHOW_PROGRESS_BAR = booleanPreferencesKey("show_progress_bar")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val EDGE_SWIPE_BRIGHTNESS = booleanPreferencesKey("edge_swipe_brightness")
         private val EDGE_SWIPE_FONT_SIZE = booleanPreferencesKey("edge_swipe_font_size")
@@ -144,6 +145,7 @@ class UserPreferences @Inject constructor(
     // ── 其他选项 ─────────────────────────────────────────
     val showStatusBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_STATUS_BAR] ?: false }
     val showNavBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_NAV_BAR] ?: false }
+    val showProgressBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PROGRESS_BAR] ?: false }
     val keepScreenOn: Flow<Boolean> = context.dataStore.data.map { it[KEEP_SCREEN_ON] ?: true }
     val edgeSwipeBrightness: Flow<Boolean> = context.dataStore.data.map { it[EDGE_SWIPE_BRIGHTNESS] ?: true }
     val edgeSwipeFontSize: Flow<Boolean> = context.dataStore.data.map { it[EDGE_SWIPE_FONT_SIZE] ?: false }
@@ -244,6 +246,7 @@ class UserPreferences @Inject constructor(
     // ── 其他选项 ─────────────────────────────────────────
     suspend fun saveShowStatusBar(v: Boolean) = context.dataStore.edit { it[SHOW_STATUS_BAR] = v }
     suspend fun saveShowNavBar(v: Boolean) = context.dataStore.edit { it[SHOW_NAV_BAR] = v }
+    suspend fun saveShowProgressBar(v: Boolean) = context.dataStore.edit { it[SHOW_PROGRESS_BAR] = v }
     suspend fun saveKeepScreenOn(v: Boolean) = context.dataStore.edit { it[KEEP_SCREEN_ON] = v }
     suspend fun saveEdgeSwipeBrightness(v: Boolean) = context.dataStore.edit { it[EDGE_SWIPE_BRIGHTNESS] = v }
     suspend fun saveEdgeSwipeFontSize(v: Boolean) = context.dataStore.edit { it[EDGE_SWIPE_FONT_SIZE] = v }
@@ -335,7 +338,7 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun saveOtherOptions(
-        showStatusBar: Boolean, showNavBar: Boolean, keepScreenOn: Boolean, edgeSwipeBrightness: Boolean,
+        showStatusBar: Boolean, showNavBar: Boolean, showProgressBar: Boolean, keepScreenOn: Boolean, edgeSwipeBrightness: Boolean,
         edgeSwipeFontSize: Boolean, keepLastLine: Boolean, smartIndent: Boolean,
         removeExtraBlank: Boolean, blueLight: Boolean, blueLightAmount: Float,
         readingReminder: Boolean, readingReminderMins: Int, ttsSplitMode: String,
@@ -343,7 +346,7 @@ class UserPreferences @Inject constructor(
         epubUseBookFont: Boolean, epubDisableCss: Boolean, epubShowAnnotations: Boolean,
     ) {
         context.dataStore.edit {
-            it[SHOW_STATUS_BAR] = showStatusBar; it[SHOW_NAV_BAR] = showNavBar; it[KEEP_SCREEN_ON] = keepScreenOn
+            it[SHOW_STATUS_BAR] = showStatusBar; it[SHOW_NAV_BAR] = showNavBar; it[SHOW_PROGRESS_BAR] = showProgressBar; it[KEEP_SCREEN_ON] = keepScreenOn
             it[EDGE_SWIPE_BRIGHTNESS] = edgeSwipeBrightness; it[EDGE_SWIPE_FONT_SIZE] = edgeSwipeFontSize
             it[KEEP_LAST_LINE] = keepLastLine; it[SMART_INDENT] = smartIndent
             it[REMOVE_EXTRA_BLANK] = removeExtraBlank; it[BLUE_LIGHT] = blueLight

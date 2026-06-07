@@ -108,6 +108,7 @@ fun EpubReaderScreen(
     readerBgColor: String = "",
     showStatusBar: Boolean = false,
     showNavBar: Boolean = false,
+    showProgressBar: Boolean = false,
 ) {
     var uiVisible by remember { mutableStateOf(true) }
     var totalPages by remember { mutableIntStateOf(1) }
@@ -185,6 +186,7 @@ fun EpubReaderScreen(
                 isTtsPlaying = epubTtsPlaying,
                 showStatusBar = showStatusBar,
                 showNavBar = showNavBar,
+                showProgressBar = false,
             ),
             visible = uiVisible,
             onBack = onBack,

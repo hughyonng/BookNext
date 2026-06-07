@@ -55,6 +55,7 @@ data class ReaderToolbarState(
     val bookmarks: List<Int> = emptyList(),
     val showStatusBar: Boolean = false,
     val showNavBar: Boolean = false,
+    val showProgressBar: Boolean = false,
 )
 
 @Composable
@@ -233,6 +234,8 @@ fun ReaderToolbarOverlay(
                         .navigationBarsPadding()
                         .padding(bottom = 4.dp),
                 ) {
+                    // 阅读进度条（默认隐藏，在阅读设置中开启）
+                    if (state.showProgressBar) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -255,6 +258,7 @@ fun ReaderToolbarOverlay(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
+                    }
                     }
 
                     Row(
@@ -401,8 +405,10 @@ fun ReaderToolbarOverlay(
             ReadingSettingsDialog(
                 showStatusBar = state.showStatusBar,
                 showNavBar = state.showNavBar,
+                showProgressBar = state.showProgressBar,
                 onToggleStatusBar = { onSaveSetting("showStatusBar", !state.showStatusBar) },
                 onToggleNavBar = { onSaveSetting("showNavBar", !state.showNavBar) },
+                onToggleProgressBar = { onSaveSetting("showProgressBar", !state.showProgressBar) },
                 onDismiss = { showReadingSettings = false },
             )
         }
@@ -919,8 +925,10 @@ private fun BgColorCircle(opt: BgColorOption, onSelect: (String) -> Unit, modifi
 private fun ReadingSettingsDialog(
     showStatusBar: Boolean,
     showNavBar: Boolean,
+    showProgressBar: Boolean,
     onToggleStatusBar: () -> Unit,
     onToggleNavBar: () -> Unit,
+    onToggleProgressBar: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -930,6 +938,7 @@ private fun ReadingSettingsDialog(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 ReadingSettingToggle("显示顶部状态栏", showStatusBar, onToggleStatusBar)
                 ReadingSettingToggle("显示底部导航栏", showNavBar, onToggleNavBar)
+                ReadingSettingToggle("阅读进度条", showProgressBar, onToggleProgressBar)
             }
         },
         confirmButton = {},
