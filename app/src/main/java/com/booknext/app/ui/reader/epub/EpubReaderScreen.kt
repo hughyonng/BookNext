@@ -125,7 +125,7 @@ fun EpubReaderScreen(
     var epubHighlightQuery by remember { mutableStateOf("") }
     var epubHighlightChapter by remember { mutableIntStateOf(-1) }
     // 覆盖层颜色（夜间模式也走覆盖层，用暖深色替代纯黑）
-    val defaultDarkBg = "#2C2416"
+    val defaultDarkBg = "#1E2428"
     val overlayColor = remember(readerBgColor, darkMode) {
         val hex = when {
             readerBgColor.isNotBlank() -> readerBgColor

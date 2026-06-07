@@ -192,7 +192,17 @@ fun TxtReaderScreen(
         onProgressChange(listState.firstVisibleItemIndex)
     }
 
-    val textColor = if (darkMode) android.graphics.Color.parseColor("#E0D8CC") else android.graphics.Color.parseColor("#1A1A1A")
+    val textColor = remember(readerBgColor, darkMode) {
+        if (readerBgColor.isNotBlank()) {
+            try {
+                val c = android.graphics.Color.parseColor(readerBgColor)
+                val bri = (0.299 * android.graphics.Color.red(c) + 0.587 * android.graphics.Color.green(c) + 0.114 * android.graphics.Color.blue(c)) / 255.0
+                if (bri < 0.5) android.graphics.Color.parseColor("#E0D8CC") else android.graphics.Color.parseColor("#1A1A1A")
+            } catch (_: Exception) {
+                if (darkMode) android.graphics.Color.parseColor("#E0D8CC") else android.graphics.Color.parseColor("#1A1A1A")
+            }
+        } else if (darkMode) android.graphics.Color.parseColor("#E0D8CC") else android.graphics.Color.parseColor("#1A1A1A")
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(

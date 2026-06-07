@@ -127,7 +127,10 @@ fun ReaderScreen(
                             darkMode = darkMode,
                             onBack = onBack,
                             onProgressChange = { viewModel.savePageProgress(it) },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it) },
                             onOrientationChange = { viewModel.setScreenOrientation(it) },
                             onBrightnessChange = { viewModel.setBrightness(it) },
@@ -207,7 +210,10 @@ fun ReaderScreen(
                                 selectedText = text
                                 selectedLocator = if (loc >= 0) "txt_line_${loc}_${start}_${end}" else "0"
                             },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it) },
                             book = book,
                             sessions = sessions,
@@ -279,7 +285,10 @@ fun ReaderScreen(
                                 selectedText = text
                                 selectedLocator = if (loc >= 0) "txt_line_${loc}_${start}_${end}" else "0"
                             },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it) },
                             book = book,
                             sessions = sessions,
@@ -337,7 +346,10 @@ fun ReaderScreen(
                             darkMode = darkMode,
                             onBack = onBack,
                             onProgressChange = { viewModel.savePageProgress(it) },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it) },
                             book = book,
                             sessions = sessions,
@@ -390,7 +402,10 @@ fun ReaderScreen(
                             initialPage = progress.toIntOrNull() ?: 0,
                             onBack = onBack,
                             onProgressChange = { viewModel.savePageProgress(it) },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it) },
                             onOrientationChange = { viewModel.setScreenOrientation(it) },
                             onBrightnessChange = { viewModel.setBrightness(it) },
@@ -415,7 +430,10 @@ fun ReaderScreen(
                             darkMode = darkMode,
                             onBack = onBack,
                             onProgressChange = { viewModel.savePageProgress(it) },
-                            onDarkModeChange = { viewModel.setDarkMode(it) },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onFontSizeChange = { viewModel.setFontSize(it.toInt()) },
                             onOrientationChange = { viewModel.setScreenOrientation(it.toString()) },
                             onBrightnessChange = { viewModel.setBrightness(it) },
