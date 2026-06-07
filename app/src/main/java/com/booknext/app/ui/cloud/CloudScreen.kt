@@ -247,6 +247,7 @@ fun CloudScreen(
             onBack = { showTransferSheet = false },
             onClearCompleted = { viewModel.clearCompletedTransfers() },
             onOpenBook = { bookId -> onBookClick(bookId) },
+            onRetry = { item -> viewModel.retryTransfer(context, item, baseUrl, apiKey) },
         )
         return
     }
@@ -330,6 +331,7 @@ private fun CloudTransferPage(
     onBack: () -> Unit,
     onClearCompleted: () -> Unit,
     onOpenBook: (String) -> Unit,
+    onRetry: (TransferItem) -> Unit,
 ) {
     val running = transfers.filter { it.status == TransferStatus.RUNNING }
     val completed = transfers.filter { it.status != TransferStatus.RUNNING }
@@ -374,7 +376,7 @@ private fun CloudTransferPage(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                 }
                 items(running, key = { it.id }) { t ->
-                    TransferItemCard(t = t, onClick = null)
+                    TransferItemCard(t = t, onClick = null, onRetry = null)
                 }
             }
 
@@ -390,6 +392,9 @@ private fun CloudTransferPage(
                         onClick = if (t.status == TransferStatus.SUCCESS && t.bookId != null) {
                             { onOpenBook(t.bookId!!) }
                         } else null,
+                        onRetry = if (t.status == TransferStatus.ERROR) {
+                            { onRetry(t) }
+                        } else null,
                     )
                 }
             }
@@ -403,12 +408,12 @@ private fun CloudTransferPage(
 private fun TransferItemCard(
     t: TransferItem,
     onClick: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
 ) {
     val progress = if (t.totalBytes > 0) (t.transferredBytes.toFloat() / t.totalBytes).coerceIn(0f, 1f) else 0f
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(vertical = 3.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(8.dp),
@@ -432,32 +437,48 @@ private fun TransferItemCard(
             )
             Column(Modifier.weight(1f)) {
                 Text(t.fileName, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
                 when (t.status) {
                     TransferStatus.RUNNING -> {
-                        Spacer(Modifier.height(6.dp))
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp))
-                        Spacer(Modifier.height(3.dp))
-                        Text("${(progress * 100).toInt()}% · ${formatSize(t.transferredBytes)}/${formatSize(t.totalBytes)}",
-                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (t.transferredBytes > 0) {
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp))
+                            Spacer(Modifier.height(3.dp))
+                            Text("${(progress * 100).toInt()}% · ${formatSize(t.transferredBytes)}/${formatSize(t.totalBytes)}",
+                                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            // 初始状态：等待中
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(4.dp))
+                            Spacer(Modifier.height(3.dp))
+                            Text("等待传输…", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     TransferStatus.SUCCESS -> {
-                        Spacer(Modifier.height(2.dp))
                         Text(
                             if (t.bookId != null) "传输完成 · 点击阅读" else "传输完成",
-                            fontSize = 11.sp, color = Color(0xFF4CAF50),
+                            fontSize = 12.sp, color = Color(0xFF4CAF50),
                         )
                     }
                     TransferStatus.ERROR -> {
-                        Spacer(Modifier.height(2.dp))
-                        Text("失败：${t.errorMessage ?: "未知错误"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                        Text("失败：${t.errorMessage ?: "未知错误"}", fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
+            // 右侧操作按钮
             if (t.status == TransferStatus.RUNNING) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp,
-                    progress = { progress })
+                if (t.transferredBytes > 0) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, progress = { progress })
+                } else {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            } else if (t.status == TransferStatus.ERROR && onRetry != null) {
+                IconButton(onClick = onRetry, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Refresh, "重试", tint = MaterialTheme.colorScheme.primary)
+                }
             } else if (t.status == TransferStatus.SUCCESS && onClick != null) {
-                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

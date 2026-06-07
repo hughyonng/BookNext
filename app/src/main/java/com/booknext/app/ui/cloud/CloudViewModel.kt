@@ -45,6 +45,7 @@ data class TransferItem(
     val fileName: String,
     val type: TransferType,
     val bookId: String? = null,
+    val sourceUri: String? = null, // 上传失败重试用
     val totalBytes: Long = 0L,
     val transferredBytes: Long = 0L,
     val status: TransferStatus = TransferStatus.RUNNING,
@@ -142,7 +143,7 @@ class CloudViewModel @Inject constructor(
         } ?: "未知文件"
 
         val transferId = UUID.randomUUID().toString()
-        addTransfer(TransferItem(id = transferId, fileName = fileName, type = TransferType.UPLOAD))
+        addTransfer(TransferItem(id = transferId, fileName = fileName, type = TransferType.UPLOAD, sourceUri = uri.toString()))
 
         viewModelScope.launch(Dispatchers.IO) {
             val ext = fileName.substringAfterLast('.', "bin")
@@ -154,10 +155,12 @@ class CloudViewModel @Inject constructor(
                 val totalBytes = tmpFile.length()
                 updateTransfer(transferId) { it.copy(totalBytes = totalBytes) }
 
-                val filePart = MultipartBody.Part.createFormData(
-                    "file", tmpFile.name,
-                    tmpFile.asRequestBody("application/octet-stream".toMediaType()),
-                )
+                val originalBody = tmpFile.asRequestBody("application/octet-stream".toMediaType())
+                // 带进度的 RequestBody
+                val progressBody = ProgressRequestBody(originalBody, totalBytes) { transferred ->
+                    updateTransfer(transferId) { it.copy(transferredBytes = transferred) }
+                }
+                val filePart = MultipartBody.Part.createFormData("file", tmpFile.name, progressBody)
                 val title = fileName.substringBeforeLast('.').toRequestBody("text/plain".toMediaType())
                 val author = "未知".toRequestBody("text/plain".toMediaType())
                 val ocr = "false".toRequestBody("text/plain".toMediaType())
@@ -252,11 +255,51 @@ class CloudViewModel @Inject constructor(
         _transfers.value = _transfers.value.filter { it.status == TransferStatus.RUNNING }
     }
 
+    fun retryTransfer(context: Context, item: TransferItem, baseUrl: String, apiKey: String) {
+        when (item.type) {
+            TransferType.UPLOAD -> {
+                val uri = item.sourceUri?.let { Uri.parse(it) } ?: return
+                _transfers.value = _transfers.value.filter { it.id != item.id }
+                uploadFile(context, uri)
+            }
+            TransferType.DOWNLOAD -> {
+                if (item.bookId == null) return
+                _transfers.value = _transfers.value.filter { it.id != item.id }
+                viewModelScope.launch {
+                    val book = bookDao.observeAll().first().find { it.bookId == item.bookId } ?: return@launch
+                    downloadBooks(context, listOf(book), baseUrl, apiKey)
+                }
+            }
+        }
+    }
+
     private fun addTransfer(item: TransferItem) {
         _transfers.value = listOf(item) + _transfers.value
     }
 
     private fun updateTransfer(id: String, block: (TransferItem) -> TransferItem) {
         _transfers.value = _transfers.value.map { if (it.id == id) block(it) else it }
+    }
+}
+
+// ── 带上传进度的 RequestBody ──
+class ProgressRequestBody(
+    private val delegate: okhttp3.RequestBody,
+    private val totalBytes: Long,
+    private val onProgress: (Long) -> Unit,
+) : okhttp3.RequestBody() {
+    override fun contentType() = delegate.contentType()
+    override fun contentLength() = totalBytes
+    override fun writeTo(sink: okio.BufferedSink) {
+        val buffer = okio.Buffer()
+        delegate.writeTo(buffer)
+        var written = 0L
+        while (buffer.size > 0) {
+            val chunk = minOf(buffer.size, 4096L)
+            sink.write(buffer, chunk)
+            written += chunk
+            onProgress(written)
+        }
+        sink.flush()
     }
 }
