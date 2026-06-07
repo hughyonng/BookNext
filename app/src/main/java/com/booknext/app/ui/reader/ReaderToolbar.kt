@@ -156,7 +156,7 @@ fun ReaderToolbarOverlay(
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(top = if (state.showStatusBar) 0.dp else 8.dp)
-                        .height(64.dp)
+                        .height(72.dp)
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -232,7 +232,7 @@ fun ReaderToolbarOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(bottom = 4.dp),
+                        .padding(top = 8.dp, bottom = 8.dp),
                 ) {
                     // 阅读进度条（默认隐藏，在阅读设置中开启）
                     if (state.showProgressBar) {
