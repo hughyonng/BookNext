@@ -64,4 +64,7 @@ interface BookDao {
 
     @Query("UPDATE books SET isFavorite = NOT isFavorite WHERE bookId = :id")
     suspend fun toggleFavorite(id: String)
+
+    @Query("UPDATE books SET coverPath = :path, hasCover = 1 WHERE bookId = :id")
+    suspend fun updateCoverPath(id: String, path: String)
 }

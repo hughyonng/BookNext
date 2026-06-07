@@ -37,6 +37,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 
 enum class SortOrder { TITLE, AUTHOR, UPLOAD_TIME, LAST_READ, ONLINE_ONLY, LOCAL_ONLY }
 enum class LayoutMode { GRID_3, GRID_4, LIST }
@@ -79,6 +80,16 @@ fun BookshelfScreen(
     var showFolderSheet by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+
+    var coverTargetBookId by remember { mutableStateOf<String?>(null) }
+    var showCoverPickerDialog by remember { mutableStateOf(false) }
+    val coverPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val bookId = coverTargetBookId ?: return@rememberLauncherForActivityResult
+        if (uri != null) viewModel.saveCoverFromUri(bookId, uri)
+        coverTargetBookId = null
+    }
 
     val folders by viewModel.folders.collectAsState()
     val localViewModel: LocalViewModel = hiltViewModel()
@@ -177,6 +188,17 @@ fun BookshelfScreen(
                                 onClick = { showMultiMenu = false; showInfoDialog = true },
                                 leadingIcon = { Icon(Icons.Default.Info, null) },
                             )
+                            if (selectedBooks.size == 1) {
+                                DropdownMenuItem(
+                                    text = { Text("设置封面") },
+                                    onClick = {
+                                        showMultiMenu = false
+                                        coverTargetBookId = selectedBooks.first()
+                                        showCoverPickerDialog = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Image, null) },
+                                )
+                            }
                         }
                     } else if (!isSearching) {
                         IconButton(onClick = { isSearching = true }) {
@@ -483,6 +505,51 @@ fun BookshelfScreen(
             }
         }
     }
+
+    if (showCoverPickerDialog) {
+        val book = coverTargetBookId?.let { id -> books.find { it.bookId == id } }
+        AlertDialog(
+            onDismissRequest = { showCoverPickerDialog = false; coverTargetBookId = null },
+            title = { Text("设置封面") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(book?.title ?: "", style = MaterialTheme.typography.bodyMedium)
+                    HorizontalDivider()
+                    TextButton(
+                        onClick = {
+                            showCoverPickerDialog = false
+                            coverPicker.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("从相册选择")
+                    }
+                    if (book?.filePath != null) {
+                        TextButton(
+                            onClick = {
+                                showCoverPickerDialog = false
+                                val id = coverTargetBookId ?: return@TextButton
+                                viewModel.extractCoverFromFile(id, book.filePath!!, book.format)
+                                coverTargetBookId = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("从文件提取封面")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCoverPickerDialog = false; coverTargetBookId = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -515,7 +582,14 @@ fun BookCard(
                     BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                 else null,
             ) {
-                if (book.hasCover) {
+                if (book.coverPath != null) {
+                    AsyncImage(
+                        model = File(book.coverPath),
+                        contentDescription = book.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (book.hasCover) {
                     AsyncImage(
                         model = "$baseUrl/api/cover/${book.bookId}?k=$apiKey",
                         contentDescription = book.title,
@@ -572,38 +646,7 @@ fun BookCard(
             }
         }
 
-        if (!compact) {
-            Spacer(Modifier.height(5.dp))
-            Text(
-                text = book.title,
-                fontSize = 11.5.sp,
-                lineHeight = 15.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 1.dp),
-            )
-            if (book.author.isNotEmpty() && book.author != "未知") {
-                Text(
-                    text = book.author,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 1.dp),
-                )
-            }
-        } else {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = book.title,
-                fontSize = 10.sp,
-                maxLines = 2,
-                lineHeight = 13.sp,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Spacer(Modifier.height(5.dp))
     }
 }
 
