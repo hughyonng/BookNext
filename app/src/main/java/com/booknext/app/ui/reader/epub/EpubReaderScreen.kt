@@ -124,12 +124,17 @@ fun EpubReaderScreen(
     var showEpubBackToResults by remember { mutableStateOf(false) }
     var epubHighlightQuery by remember { mutableStateOf("") }
     var epubHighlightChapter by remember { mutableIntStateOf(-1) }
-    // 覆盖层颜色
+    // 覆盖层颜色（夜间模式也走覆盖层，用暖深色替代纯黑）
+    val defaultDarkBg = "#2C2416"
     val overlayColor = remember(readerBgColor, darkMode) {
-        if (darkMode || readerBgColor.isBlank()) null
-        else try {
-            Color(android.graphics.Color.parseColor(readerBgColor)).copy(alpha = 0.30f)
-        } catch (_: Exception) { null }
+        val hex = when {
+            readerBgColor.isNotBlank() -> readerBgColor
+            darkMode -> defaultDarkBg
+            else -> null
+        }
+        if (hex != null) try {
+            Color(android.graphics.Color.parseColor(hex)).copy(alpha = 0.30f)
+        } catch (_: Exception) { null } else null
     }
     Box(Modifier.fillMaxSize()) {
         key(darkMode, fontSize) {
@@ -158,7 +163,7 @@ fun EpubReaderScreen(
     modifier = Modifier.fillMaxSize(),
         )
         }
-        // 背景色覆盖层（非深色模式、有自定义背景时叠加）
+        // 背景色覆盖层（有自定义背景或夜间模式时叠加）
         if (overlayColor != null) {
             Box(
                 modifier = Modifier
@@ -551,7 +556,7 @@ private suspend fun openEpubPublication(
             "monospace" -> org.readium.r2.navigator.preferences.FontFamily.MONOSPACE
             else -> org.readium.r2.navigator.preferences.FontFamily.SERIF
         },
-        theme = if (darkMode) Theme.DARK else Theme.LIGHT,
+        theme = Theme.LIGHT, // 始终用 LIGHT，暗色由 Compose 覆盖层控制
         scroll = true,
         publisherStyles = false,
     )

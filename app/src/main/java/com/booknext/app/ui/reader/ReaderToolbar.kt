@@ -817,8 +817,8 @@ private val BG_COLORS = listOf(
     BgColorOption("浅灰", "#E8E8E8"),
     BgColorOption("豆沙绿", "#B7C9B7"),
     BgColorOption("杏仁", "#F7EED3"),
-    BgColorOption("暗灰", "#3A3A3A"),
     BgColorOption("深褐", "#2C2416"),
+    BgColorOption("暗灰", "#3A3A3A"),
     BgColorOption("墨绿黑", "#1E2A1E"),
 )
 
