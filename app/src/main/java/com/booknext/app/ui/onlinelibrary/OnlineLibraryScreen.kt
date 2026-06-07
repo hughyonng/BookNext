@@ -78,7 +78,7 @@ fun OnlineLibraryScreen(
             item {
                 Text("免费电子书资源", style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 4.dp))
-                Text("点击链接在浏览器中打开各书源 · 长按可选中删除",
+                Text("点击链接在浏览器中打开各书源 · 长按可删除自定义源 · 固定源不可删除",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp))
             }
