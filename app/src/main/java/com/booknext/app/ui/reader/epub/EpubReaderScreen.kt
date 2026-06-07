@@ -186,7 +186,7 @@ fun EpubReaderScreen(
                 isTtsPlaying = epubTtsPlaying,
                 showStatusBar = showStatusBar,
                 showNavBar = showNavBar,
-                showProgressBar = false,
+                showProgressBar = showProgressBar,
             ),
             visible = uiVisible,
             onBack = onBack,
