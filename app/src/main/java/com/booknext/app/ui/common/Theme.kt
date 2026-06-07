@@ -35,8 +35,8 @@ fun BookNextTheme(
     val colors = if (isDark) {
         darkColorScheme(
             primary = Color(0xFF90CAF9),
-            surface = Color(0xFF121212),
-            background = Color(0xFF121212),
+            surface = Color(0xFF1E2428),
+            background = Color(0xFF1E2428),
             onSurface = Color(0xFFE0E0E0),
             onBackground = Color(0xFFE0E0E0),
         )
