@@ -250,6 +250,8 @@ class ReaderViewModel @Inject constructor(
 
     private val _ttsPlaying = MutableStateFlow(false)
     val ttsPlaying: StateFlow<Boolean> = _ttsPlaying
+    private val _ttsLoading = MutableStateFlow(false)
+    val ttsLoading: StateFlow<Boolean> = _ttsLoading
     private var cloudPlayer: MediaPlayer? = null
     private var localTts: TextToSpeech? = null
     private var localTtsReady = false
@@ -369,30 +371,52 @@ class ReaderViewModel @Inject constructor(
 
     private fun startCloudTts(text: String) {
         _ttsPlaying.value = true
+        _ttsLoading.value = true
         val safe = text.take(3800)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val req = com.booknext.app.data.remote.dto.TtsRequest(
-                    text = safe,
-                    voice = _ttsCloudVoice.value,
-                    rate = _ttsCloudRate.value,
-                    pitch = _ttsCloudPitch.value,
-                )
-                val responseBody = apiClient.api().tts(req)
+                val voice = _ttsCloudVoice.value
+                val rate = _ttsCloudRate.value
+                val pitch = _ttsCloudPitch.value
+                // 使用 GET 流式接口
+                val url = "${prefs.serverUrl.first().trimEnd('/')}/api/tts/stream" +
+                    "?text=${java.net.URLEncoder.encode(safe, "UTF-8")}" +
+                    "&voice=${java.net.URLEncoder.encode(voice, "UTF-8")}" +
+                    "&rate=${java.net.URLEncoder.encode(rate, "UTF-8")}" +
+                    "&pitch=${java.net.URLEncoder.encode(pitch, "UTF-8")}"
+                val request = okhttp3.Request.Builder().url(url)
+                    .addHeader("Authorization", "Bearer ${prefs.apiKey.first()}")
+                    .build()
+                val response = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build().newCall(request).execute()
+                if (!response.isSuccessful) {
+                    android.util.Log.e("BookNext", "TTS HTTP ${response.code}: ${response.body?.string()}")
+                    _ttsPlaying.value = false
+                    return@launch
+                }
                 val tmpFile = File(context.cacheDir, "tts_tmp.mp3")
-                tmpFile.outputStream().use { out -> responseBody.byteStream().use { inp -> inp.copyTo(out) } }
+                response.body?.byteStream()?.use { inp ->
+                    tmpFile.outputStream().use { out -> inp.copyTo(out) }
+                }
                 withContext(Dispatchers.Main) {
                     cloudPlayer?.release()
                     cloudPlayer = MediaPlayer().apply {
                         setDataSource(tmpFile.absolutePath)
-                        setOnPreparedListener { start() }
+                        setOnPreparedListener { _ttsLoading.value = false; start() }
                         setOnCompletionListener { _ttsPlaying.value = false }
-                        setOnErrorListener { _, _, _ -> _ttsPlaying.value = false; true }
+                        setOnErrorListener { _, what, extra ->
+                            _ttsLoading.value = false
+                            _ttsPlaying.value = false
+                            android.util.Log.e("BookNext", "MediaPlayer error what=$what extra=$extra"); true
+                        }
                         prepareAsync()
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("BookNext", "Cloud TTS error", e)
+                android.util.Log.e("BookNext", "Cloud TTS error: ${e.message}", e)
+                _ttsLoading.value = false
                 _ttsPlaying.value = false
             }
         }
@@ -427,6 +451,7 @@ class ReaderViewModel @Inject constructor(
         cloudPlayer = null
         localTts?.stop()
         pendingTtsText = null
+        _ttsLoading.value = false
         _ttsPlaying.value = false
     }
 

@@ -61,6 +61,7 @@ fun ReaderScreen(
     val ttsCloudVoice by viewModel.ttsCloudVoice.collectAsState()
     val ttsCloudRate by viewModel.ttsCloudRate.collectAsState()
     val ttsCloudPitch by viewModel.ttsCloudPitch.collectAsState()
+    val ttsLoading by viewModel.ttsLoading.collectAsState()
 
     val context = LocalContext.current
     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -186,6 +187,7 @@ fun ReaderScreen(
                             onTtsRequest = { viewModel.startTts(it) },
                             isTtsPlaying = ttsPlaying,
                             stopTts = { viewModel.stopTts() },
+                            ttsLoading = ttsLoading,
                             ttsEngineList = ttsEngineList,
                             ttsEngineId = ttsEngineId,
                             onTtsEngineChange = { viewModel.setTtsEngine(it) },

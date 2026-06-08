@@ -66,6 +66,7 @@ data class ReaderToolbarState(
     val brightness: Float = -1f,
     val screenOrientation: String = "auto",
     val isTtsPlaying: Boolean = false,
+    val isTtsLoading: Boolean = false,
     val tocEntries: List<TocEntry> = emptyList(),
     val bookmarks: List<Int> = emptyList(),
     val showStatusBar: Boolean = false,
@@ -415,6 +416,7 @@ fun ReaderToolbarOverlay(
                             onStop = { onTtsStop(); showTtsPanel = false },
                             onTogglePlay = { if (state.isTtsPlaying) onTtsStop() else onTtsStart() },
                             onSettings = { showTtsSettings = true },
+                            isLoading = state.isTtsLoading,
                         )
                     }
                 }
@@ -620,6 +622,7 @@ private fun TtsControlPanel(
     onStop: () -> Unit,
     onTogglePlay: () -> Unit,
     onSettings: () -> Unit = {},
+    isLoading: Boolean = false,
 ) {
     var volume by remember { mutableFloatStateOf(50f) }
     var pitch by remember { mutableFloatStateOf(10f) }
@@ -635,6 +638,13 @@ private fun TtsControlPanel(
         TtsSliderRow("音量", volume, 0f, 100f) { volume = it }
         TtsSliderRow("音调", pitch, 0f, 20f) { pitch = it }
         TtsSliderRow("语速", speed, 0f, 20f) { speed = it }
+        if (isLoading) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("正在生成语音…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,

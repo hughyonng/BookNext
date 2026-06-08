@@ -84,6 +84,7 @@ fun EpubReaderScreen(
     onTtsRequest: (String) -> Unit = {},
     isTtsPlaying: Boolean = false,
     stopTts: () -> Unit = {},
+    ttsLoading: Boolean = false,
     // TTS 引擎设置
     ttsEngineList: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry> = emptyList(),
     ttsEngineId: String = "cloud",
@@ -125,7 +126,8 @@ fun EpubReaderScreen(
     var tocEntries by remember { mutableStateOf<List<TocEntry>>(emptyList()) }
     var epubTtsPlaying by remember { mutableStateOf(false) }
     var ttsChapterText by remember { mutableStateOf("") }
-    // 同步 ViewModel 的 TTS 状态到本地状态（朗读完成时自动关闭切换开关）
+    var ttsLoading by remember { mutableStateOf(false) }
+    // 同步 ViewModel 的 TTS 状态到本地状态
     LaunchedEffect(isTtsPlaying) {
         epubTtsPlaying = isTtsPlaying
     }
@@ -198,6 +200,7 @@ fun EpubReaderScreen(
                 tocEntries = tocEntries,
                 bookmarks = bookmarks,
                 isTtsPlaying = epubTtsPlaying,
+                isTtsLoading = ttsLoading,
                 showStatusBar = showStatusBar,
                 showNavBar = showNavBar,
                 showProgressBar = showProgressBar,
