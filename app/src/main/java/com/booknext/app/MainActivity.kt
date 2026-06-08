@@ -61,9 +61,12 @@ class MainActivity : FragmentActivity() {
 
             var appState by remember { mutableStateOf(AppState.WELCOME) }
             LaunchedEffect(Unit) {
+                // 直接从 DataStore 读，等待实际值加载完成
+                val savedUrl = prefs.serverUrl.first()
+                val savedKey = prefs.apiKey.first()
                 val hasSeenWelcome = prefs.hasSeenWelcome.first()
                 appState = when {
-                    isLoggedIn -> AppState.MAIN
+                    savedUrl.isNotBlank() && savedKey.isNotBlank() -> AppState.MAIN
                     hasSeenWelcome -> AppState.LOGIN
                     else -> AppState.WELCOME
                 }
