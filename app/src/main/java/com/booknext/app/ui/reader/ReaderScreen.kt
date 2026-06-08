@@ -252,6 +252,10 @@ fun ReaderScreen(
                             onTtsRequest = { viewModel.startTts(it) },
                             isTtsPlaying = ttsPlaying,
                             onTtsStop = { viewModel.stopTts() },
+                            onDarkModeChange = { enabled ->
+                                viewModel.setDarkMode(enabled)
+                                viewModel.setBgColor(if (enabled) "#1E2428" else "")
+                            },
                             onAnnotationsClick = {
                                 if (selectedText.isNotEmpty()) showAnnotationDialog = true
                                 else showSidebar = true

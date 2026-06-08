@@ -249,6 +249,7 @@ class ReaderViewModel @Inject constructor(
     private var cloudPlayer: MediaPlayer? = null
     private var localTts: TextToSpeech? = null
     private var pendingTtsText: String? = null
+    private var ttsGeneration = 0L
 
     private val _bookmarks = MutableStateFlow<List<Int>>(emptyList())
     val bookmarks: StateFlow<List<Int>> = _bookmarks
@@ -357,6 +358,7 @@ class ReaderViewModel @Inject constructor(
     private fun startCloudTts(text: String) {
         _ttsPlaying.value = true
         _ttsLoading.value = true
+        val gen = ++ttsGeneration
         val safe = text.take(3800)
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -370,6 +372,7 @@ class ReaderViewModel @Inject constructor(
                 val bytes = body.bytes()
 
                 withContext(Dispatchers.Main) {
+                    if (gen != ttsGeneration) return@withContext
                     try {
                         cloudPlayer?.release()
                         val tempFile = java.io.File(context.cacheDir, "tts_${System.currentTimeMillis()}.mp3")
@@ -419,6 +422,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun startLocalTts(text: String) {
+        val gen = ++ttsGeneration
         _ttsPlaying.value = true
         localTts?.stop()
         localTts?.shutdown()
@@ -447,13 +451,14 @@ class ReaderViewModel @Inject constructor(
         val actCtx = activityRef
         val ctxList = if (actCtx != null) listOf(context, actCtx) else listOf(context)
 
-        tryEnginesMultiCtx(text, safeTtsText(text), engines, ctxList, 0, 0)
+        tryEnginesMultiCtx(text, safeTtsText(text), engines, ctxList, 0, 0, gen)
     }
 
-    private fun tryEnginesMultiCtx(text: String, safe: String, engines: List<String>, ctxs: List<android.content.Context>, eIdx: Int, cIdx: Int) {
+    private fun tryEnginesMultiCtx(text: String, safe: String, engines: List<String>, ctxs: List<android.content.Context>, eIdx: Int, cIdx: Int, gen: Long) {
+        if (gen != ttsGeneration) { _ttsPlaying.value = false; return }
         if (cIdx >= ctxs.size) { _ttsPlaying.value = false; return }
         if (eIdx >= engines.size) {
-            tryEnginesMultiCtx(text, safe, engines, ctxs, 0, cIdx + 1)
+            tryEnginesMultiCtx(text, safe, engines, ctxs, 0, cIdx + 1, gen)
             return
         }
         val pkg = engines[eIdx]
@@ -464,7 +469,7 @@ class ReaderViewModel @Inject constructor(
             if (status != TextToSpeech.SUCCESS) {
                 localTts?.shutdown()
                 localTts = null
-                tryEnginesMultiCtx(text, safe, engines, ctxs, eIdx + 1, cIdx)
+                tryEnginesMultiCtx(text, safe, engines, ctxs, eIdx + 1, cIdx, gen)
                 return@TextToSpeech
             }
             android.util.Log.d("BookNext", "TTS engine [$pkg] ready! speaking ${safe.length} chars")
@@ -488,6 +493,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun stopTts() {
+        ttsGeneration++
         cloudPlayer?.apply { if (isPlaying) stop(); release() }
         cloudPlayer = null
         localTts?.stop()
