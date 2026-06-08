@@ -416,10 +416,20 @@ class ReaderViewModel @Inject constructor(
         localTts?.stop()
         localTts?.shutdown()
         localTts = null
+
+        // 读取系统设置的默认TTS引擎包名
+        var enginePkg: String? = null
+        try {
+            enginePkg = android.provider.Settings.Secure.getString(
+                context.contentResolver, "tts_default_synth"
+            )
+            android.util.Log.d("BookNext", "TTS default engine from settings: $enginePkg")
+        } catch (_: Exception) {}
+
         val safe = safeTtsText(text)
         pendingTtsText = safe
-        localTts = TextToSpeech(context) { status ->
-            android.util.Log.d("BookNext", "Local TTS init status=$status")
+        localTts = TextToSpeech(context, { status ->
+            android.util.Log.d("BookNext", "Local TTS init status=$status engine=$enginePkg")
             if (status != TextToSpeech.SUCCESS) {
                 android.util.Log.e("BookNext", "Local TTS init failed status=$status")
                 _ttsPlaying.value = false
@@ -439,7 +449,7 @@ class ReaderViewModel @Inject constructor(
                 android.util.Log.e("BookNext", "TTS speak error: ${e.message}")
                 _ttsPlaying.value = false
             }
-        }
+        }, enginePkg?.ifEmpty { null })
     }
 
     fun stopTts() {
