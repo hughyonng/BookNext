@@ -85,6 +85,10 @@ class UserPreferences @Inject constructor(
         private val READING_REMINDER = booleanPreferencesKey("reading_reminder")
         private val READING_REMINDER_MINS = intPreferencesKey("reading_reminder_mins")
         private val TTS_SPLIT_MODE = stringPreferencesKey("tts_split_mode")
+        private val TTS_ENGINE_ID = stringPreferencesKey("tts_engine_id")
+        private val TTS_CLOUD_VOICE = stringPreferencesKey("tts_cloud_voice")
+        private val TTS_CLOUD_RATE = stringPreferencesKey("tts_cloud_rate")
+        private val TTS_CLOUD_PITCH = stringPreferencesKey("tts_cloud_pitch")
         private val ALLOW_TILT_FLIP = booleanPreferencesKey("allow_tilt_flip")
         private val ALLOW_PINCH_FONT = booleanPreferencesKey("allow_pinch_font")
         private val ALLOW_SWIPE_FLIP = booleanPreferencesKey("allow_swipe_flip")
@@ -165,6 +169,10 @@ class UserPreferences @Inject constructor(
     val readingReminder: Flow<Boolean> = context.dataStore.data.map { it[READING_REMINDER] ?: false }
     val readingReminderMins: Flow<Int> = context.dataStore.data.map { it[READING_REMINDER_MINS] ?: 30 }
     val ttsSplitMode: Flow<String> = context.dataStore.data.map { it[TTS_SPLIT_MODE] ?: "sentence" }
+    val ttsEngineId: Flow<String> = context.dataStore.data.map { it[TTS_ENGINE_ID] ?: "cloud" }
+    val ttsCloudVoice: Flow<String> = context.dataStore.data.map { it[TTS_CLOUD_VOICE] ?: "zh-CN-XiaoxiaoNeural" }
+    val ttsCloudRate: Flow<String> = context.dataStore.data.map { it[TTS_CLOUD_RATE] ?: "+0%" }
+    val ttsCloudPitch: Flow<String> = context.dataStore.data.map { it[TTS_CLOUD_PITCH] ?: "+0Hz" }
     val allowTiltFlip: Flow<Boolean> = context.dataStore.data.map { it[ALLOW_TILT_FLIP] ?: false }
     val allowPinchFont: Flow<Boolean> = context.dataStore.data.map { it[ALLOW_PINCH_FONT] ?: true }
     val allowSwipeFlip: Flow<Boolean> = context.dataStore.data.map { it[ALLOW_SWIPE_FLIP] ?: true }
@@ -278,6 +286,10 @@ class UserPreferences @Inject constructor(
     suspend fun saveReadingReminder(v: Boolean) = context.dataStore.edit { it[READING_REMINDER] = v }
     suspend fun saveReadingReminderMins(v: Int) = context.dataStore.edit { it[READING_REMINDER_MINS] = v }
     suspend fun saveTtsSplitMode(v: String) = context.dataStore.edit { it[TTS_SPLIT_MODE] = v }
+    suspend fun saveTtsEngineId(v: String) = context.dataStore.edit { it[TTS_ENGINE_ID] = v }
+    suspend fun saveTtsCloudVoice(v: String) = context.dataStore.edit { it[TTS_CLOUD_VOICE] = v }
+    suspend fun saveTtsCloudRate(v: String) = context.dataStore.edit { it[TTS_CLOUD_RATE] = v }
+    suspend fun saveTtsCloudPitch(v: String) = context.dataStore.edit { it[TTS_CLOUD_PITCH] = v }
     suspend fun saveAllowTiltFlip(v: Boolean) = context.dataStore.edit { it[ALLOW_TILT_FLIP] = v }
     suspend fun saveAllowPinchFont(v: Boolean) = context.dataStore.edit { it[ALLOW_PINCH_FONT] = v }
     suspend fun saveAllowSwipeFlip(v: Boolean) = context.dataStore.edit { it[ALLOW_SWIPE_FLIP] = v }

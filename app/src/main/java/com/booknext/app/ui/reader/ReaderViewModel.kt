@@ -1,6 +1,7 @@
 package com.booknext.app.ui.reader
 
 import android.content.Context
+import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.ViewModel
@@ -28,6 +29,7 @@ import com.booknext.app.ui.reader.options.VisualOptions
 import com.booknext.app.ui.reader.options.ControlOptions
 import com.booknext.app.ui.reader.options.OtherOptions
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import org.apache.poi.xwpf.usermodel.XWPFDocument
@@ -238,26 +240,30 @@ class ReaderViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OtherOptions())
 
+    // ── TTS 引擎 ──────────────────────────────────────────────
+    data class TtsEngineEntry(
+        val id: String,
+        val label: String,
+        val type: EngineType,
+    )
+    enum class EngineType { CLOUD, LOCAL }
+
     private val _ttsPlaying = MutableStateFlow(false)
     val ttsPlaying: StateFlow<Boolean> = _ttsPlaying
-    private var _ttsJob: Job? = null
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
+    private var cloudPlayer: MediaPlayer? = null
+    private var localTts: TextToSpeech? = null
+    private var localTtsReady = false
     private var pendingTtsText: String? = null
 
     private val _bookmarks = MutableStateFlow<List<Int>>(emptyList())
     val bookmarks: StateFlow<List<Int>> = _bookmarks
-
     private val _annotations = MutableStateFlow<List<AnnotationEntity>>(emptyList())
     val annotations: StateFlow<List<AnnotationEntity>> = _annotations
-
     private val _sessions = MutableStateFlow<List<ReadingSessionEntity>>(emptyList())
     val sessions: StateFlow<List<ReadingSessionEntity>> = _sessions
-
     private var sessionStartMs: Long = 0L
     private var sessionStartProgress: Float = 0f
     private var sessionStartChars: Long = 0L
-
     private var annotationsJob: Job? = null
     private var sessionsJob: Job? = null
 
@@ -274,27 +280,160 @@ class ReaderViewModel @Inject constructor(
             sessionDao.observeSessions(bookId).collect { _sessions.value = it }
         }
     }
-
     fun toggleFavorite() {
         val b = _book.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             bookDao.toggleFavorite(b.bookId)
         }
     }
-
     fun loadAnnotations(bookId: String) {
         annotationsJob?.cancel()
         annotationsJob = viewModelScope.launch(Dispatchers.IO) {
             annotationDao.observeByBook(bookId).collect { _annotations.value = it }
         }
     }
-
     fun saveAnnotation(annotation: AnnotationEntity) {
         viewModelScope.launch(Dispatchers.IO) { annotationDao.upsert(annotation) }
     }
-
     fun deleteAnnotation(id: String) {
         viewModelScope.launch(Dispatchers.IO) { annotationDao.deleteById(id) }
+    }
+
+    private val _availableEngines = MutableStateFlow<List<TtsEngineEntry>>(emptyList())
+    val availableEngines: StateFlow<List<TtsEngineEntry>> = _availableEngines
+
+    private val _ttsEngineId = MutableStateFlow("cloud")
+    val ttsEngineId: StateFlow<String> = _ttsEngineId
+    private val _ttsCloudVoice = MutableStateFlow("zh-CN-XiaoxiaoNeural")
+    val ttsCloudVoice: StateFlow<String> = _ttsCloudVoice
+    private val _ttsCloudRate = MutableStateFlow("+0%")
+    val ttsCloudRate: StateFlow<String> = _ttsCloudRate
+    private val _ttsCloudPitch = MutableStateFlow("+0Hz")
+    val ttsCloudPitch: StateFlow<String> = _ttsCloudPitch
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            discoverEngines()
+            _ttsEngineId.value = prefs.ttsEngineId.first()
+            _ttsCloudVoice.value = prefs.ttsCloudVoice.first()
+            _ttsCloudRate.value = prefs.ttsCloudRate.first()
+            _ttsCloudPitch.value = prefs.ttsCloudPitch.first()
+        }
+    }
+
+    private fun discoverEngines() {
+        val list = mutableListOf(TtsEngineEntry("cloud", "云端引擎（微软）", EngineType.CLOUD))
+        try {
+            val intent = android.content.Intent(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA)
+            val resolveList = context.packageManager.queryIntentActivities(intent, 0)
+            resolveList.forEach { ri ->
+                val pkg = ri.activityInfo.packageName
+                val label = ri.loadLabel(context.packageManager).toString()
+                list.add(TtsEngineEntry(pkg, label, EngineType.LOCAL))
+            }
+        } catch (_: Exception) {}
+        if (list.size == 1) {
+            // 没有扫描到任何引擎，至少加一个默认引擎入口
+            list.add(TtsEngineEntry("", "系统默认引擎", EngineType.LOCAL))
+        }
+        _availableEngines.value = list
+    }
+
+    fun setTtsEngine(id: String) {
+        _ttsEngineId.value = id
+        viewModelScope.launch { prefs.saveTtsEngineId(id) }
+    }
+    fun setTtsCloudVoice(voice: String) {
+        _ttsCloudVoice.value = voice
+        viewModelScope.launch { prefs.saveTtsCloudVoice(voice) }
+    }
+    fun setTtsCloudRate(rate: String) {
+        _ttsCloudRate.value = rate
+        viewModelScope.launch { prefs.saveTtsCloudRate(rate) }
+    }
+    fun setTtsCloudPitch(pitch: String) {
+        _ttsCloudPitch.value = pitch
+        viewModelScope.launch { prefs.saveTtsCloudPitch(pitch) }
+    }
+
+    fun startTts(text: String) {
+        val engine = _availableEngines.value.find { it.id == _ttsEngineId.value }
+        if (engine == null) { _ttsPlaying.value = true; _ttsPlaying.value = false; return }
+
+        if (engine.type == EngineType.CLOUD) {
+            startCloudTts(text)
+        } else {
+            startLocalTts(text, engine.id)
+        }
+    }
+
+    private fun startCloudTts(text: String) {
+        _ttsPlaying.value = true
+        val safe = text.take(3800)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val req = com.booknext.app.data.remote.dto.TtsRequest(
+                    text = safe,
+                    voice = _ttsCloudVoice.value,
+                    rate = _ttsCloudRate.value,
+                    pitch = _ttsCloudPitch.value,
+                )
+                val responseBody = apiClient.api().tts(req)
+                val tmpFile = File(context.cacheDir, "tts_tmp.mp3")
+                tmpFile.outputStream().use { out -> responseBody.byteStream().use { inp -> inp.copyTo(out) } }
+                withContext(Dispatchers.Main) {
+                    cloudPlayer?.release()
+                    cloudPlayer = MediaPlayer().apply {
+                        setDataSource(tmpFile.absolutePath)
+                        setOnPreparedListener { start() }
+                        setOnCompletionListener { _ttsPlaying.value = false }
+                        setOnErrorListener { _, _, _ -> _ttsPlaying.value = false; true }
+                        prepareAsync()
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("BookNext", "Cloud TTS error", e)
+                _ttsPlaying.value = false
+            }
+        }
+    }
+
+    private fun startLocalTts(text: String, engineId: String) {
+        _ttsPlaying.value = true
+        // 销毁旧引擎重建，确保使用指定引擎
+        localTts?.stop()
+        localTts?.shutdown()
+        localTts = null
+        localTtsReady = false
+
+        val safe = safeTtsText(text)
+        pendingTtsText = safe
+        localTts = TextToSpeech(context, { status ->
+            localTtsReady = true
+            android.util.Log.d("BookNext", "Local TTS init engine=$engineId status=$status")
+            val pending = pendingTtsText ?: return@TextToSpeech
+            pendingTtsText = null
+            localTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
+                override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
+            })
+            try { localTts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts") } catch (_: Exception) {}
+        }, engineId.ifEmpty { null })
+    }
+
+    fun stopTts() {
+        cloudPlayer?.apply { if (isPlaying) stop(); release() }
+        cloudPlayer = null
+        localTts?.stop()
+        pendingTtsText = null
+        _ttsPlaying.value = false
+    }
+
+    private fun safeTtsText(text: String): String {
+        val maxLen = (TextToSpeech.getMaxSpeechInputLength().coerceAtMost(3800))
+            .coerceAtMost(text.length)
+        return text.substring(0, maxLen)
     }
 
     fun loadBook(bookId: String) {
@@ -307,7 +446,6 @@ class ReaderViewModel @Inject constructor(
             }
             _book.value = entity
             _progress.value = entity.progress
-
             // 加载书签
             _bookmarks.value = prefs.observeBookmarks(bookId).first()
 
@@ -367,77 +505,6 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private fun safeTtsText(text: String): String {
-        val maxLen = (TextToSpeech.getMaxSpeechInputLength().coerceAtMost(3800))
-            .coerceAtMost(text.length)
-        return text.substring(0, maxLen)
-    }
-
-    private fun initTts() {
-        if (tts != null) return
-
-        tts = TextToSpeech(context) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
-            android.util.Log.d("BookNext", "TTS init status=$status ready=$ttsReady")
-            if (ttsReady) {
-                var langResult = tts?.setLanguage(Locale.CHINESE) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                android.util.Log.d("BookNext", "TTS setLanguage(CHINESE)=$langResult")
-                if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    langResult = tts?.setLanguage(Locale.CHINA) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                    android.util.Log.d("BookNext", "TTS setLanguage(CHINA)=$langResult")
-                    if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        // fallback: use system default locale
-                        tts?.setLanguage(Locale.getDefault())
-                        android.util.Log.d("BookNext", "TTS setLanguage(default)=${Locale.getDefault()}")
-                    }
-                }
-                val pending = pendingTtsText
-                pendingTtsText = null
-                if (pending != null) {
-                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) {}
-                        override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
-                        override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
-                    })
-                    val safe = safeTtsText(pending)
-                    android.util.Log.d("BookNext", "TTS speaking ${safe.length} chars (was ${pending.length})")
-                    val result = tts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts")
-                    android.util.Log.d("BookNext", "TTS speak result=$result")
-                }
-            } else {
-                pendingTtsText = null
-                _ttsPlaying.value = false
-            }
-        }
-    }
-
-    fun startTts(text: String) {
-        val safe = safeTtsText(text)
-        android.util.Log.d("BookNext", "startTts ${safe.length}/${text.length} chars tts=$tts ttsReady=$ttsReady")
-        if (ttsReady && tts != null) {
-            _ttsPlaying.value = true
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
-                override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
-                override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
-            })
-            val result = tts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts")
-            android.util.Log.d("BookNext", "TTS speak result=$result")
-        } else if (tts == null) {
-            pendingTtsText = safe
-            _ttsPlaying.value = true
-            initTts()
-        } else {
-            pendingTtsText = safe
-            _ttsPlaying.value = true
-        }
-    }
-
-    fun stopTts() {
-        tts?.stop()
-        pendingTtsText = null
-        _ttsPlaying.value = false
-    }
     fun setDarkMode(enabled: Boolean) {
         android.util.Log.d("BookNext", "setDarkMode=$enabled")
         viewModelScope.launch { prefs.saveDarkMode(enabled) }
@@ -573,8 +640,10 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        tts?.shutdown()
-        tts = null
+        localTts?.shutdown()
+        localTts = null
+        cloudPlayer?.release()
+        cloudPlayer = null
         super.onCleared()
         val bookId = _book.value?.bookId ?: return
         val elapsed = (System.currentTimeMillis() - sessionStartMs) / 1000

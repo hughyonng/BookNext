@@ -114,6 +114,16 @@ fun ReaderToolbarOverlay(
     onDictionaryLookup: () -> Unit = {},
     onSetReaderBgColor: (String) -> Unit = {},
     readerBgColor: String = "",
+    // TTS 引擎设置
+    ttsEngineList: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry> = emptyList(),
+    ttsEngineId: String = "cloud",
+    onTtsEngineChange: (String) -> Unit = {},
+    ttsCloudVoice: String = "zh-CN-XiaoxiaoNeural",
+    onTtsCloudVoiceChange: (String) -> Unit = {},
+    ttsCloudRate: String = "+0%",
+    onTtsCloudRateChange: (String) -> Unit = {},
+    ttsCloudPitch: String = "+0Hz",
+    onTtsCloudPitchChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -152,6 +162,7 @@ fun ReaderToolbarOverlay(
     var showTranslateSettings by remember { mutableStateOf(false) }
     var showBgColor by remember { mutableStateOf(false) }
     var showReadingSettings by remember { mutableStateOf(false) }
+    var showTtsSettings by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
 
@@ -403,10 +414,26 @@ fun ReaderToolbarOverlay(
                             isTtsPlaying = state.isTtsPlaying,
                             onStop = { onTtsStop(); showTtsPanel = false },
                             onTogglePlay = { if (state.isTtsPlaying) onTtsStop() else onTtsStart() },
+                            onSettings = { showTtsSettings = true },
                         )
                     }
                 }
             }
+        }
+
+        if (showTtsSettings) {
+            TtsSettingsDialog(
+                engines = ttsEngineList,
+                currentEngineId = ttsEngineId,
+                onEngineChange = { onTtsEngineChange(it); showTtsSettings = false },
+                cloudVoice = ttsCloudVoice,
+                onCloudVoiceChange = onTtsCloudVoiceChange,
+                cloudRate = ttsCloudRate,
+                onCloudRateChange = onTtsCloudRateChange,
+                cloudPitch = ttsCloudPitch,
+                onCloudPitchChange = onTtsCloudPitchChange,
+                onDismiss = { showTtsSettings = false },
+            )
         }
 
         if (showToc) {
@@ -592,6 +619,7 @@ private fun TtsControlPanel(
     isTtsPlaying: Boolean,
     onStop: () -> Unit,
     onTogglePlay: () -> Unit,
+    onSettings: () -> Unit = {},
 ) {
     var volume by remember { mutableFloatStateOf(50f) }
     var pitch by remember { mutableFloatStateOf(10f) }
@@ -625,7 +653,7 @@ private fun TtsControlPanel(
             }
             IconButton(onClick = {}) { Icon(Icons.Default.FastForward, "快进") }
             IconButton(onClick = {}) { Icon(Icons.Default.SkipNext, "下一句") }
-            IconButton(onClick = {}) { Icon(Icons.Default.Settings, "设置") }
+            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "设置") }
         }
     }
 }
@@ -660,6 +688,97 @@ private fun TtsSliderRow(
             onClick = { onValueChange((value + 1).coerceAtMost(max)) },
             modifier = Modifier.size(32.dp),
         ) { Text("+") }
+    }
+}
+
+@Composable
+private fun TtsSettingsDialog(
+    engines: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry>,
+    currentEngineId: String,
+    onEngineChange: (String) -> Unit,
+    cloudVoice: String,
+    onCloudVoiceChange: (String) -> Unit,
+    cloudRate: String,
+    onCloudRateChange: (String) -> Unit,
+    cloudPitch: String,
+    onCloudPitchChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val currentEngine = engines.find { it.id == currentEngineId }
+    val isCloud = currentEngine?.type == com.booknext.app.ui.reader.ReaderViewModel.EngineType.CLOUD
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(12.dp), tonalElevation = 6.dp) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Text("朗读引擎", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 12.dp))
+
+                Text("选择引擎", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                engines.forEach { engine ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable { onEngineChange(engine.id) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(engine.label, style = MaterialTheme.typography.bodyLarge)
+                        if (engine.id == currentEngineId) {
+                            Icon(Icons.Default.Check, null,
+                                tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    HorizontalDivider()
+                }
+
+                if (isCloud) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("云端引擎设置", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+
+                    val voices = listOf(
+                        "zh-CN-XiaoxiaoNeural" to "晓晓（女声）",
+                        "zh-CN-YunyangNeural" to "云扬（男声）",
+                        "zh-CN-XiaoyiNeural" to "晓伊（女童）",
+                        "zh-CN-YunxiNeural" to "云希（男童）",
+                        "zh-CN-XiaohanNeural" to "晓涵（女声）",
+                        "en-US-JennyNeural" to "Jenny（英语）",
+                    )
+                    Text("发音人", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    voices.forEach { (id, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { onCloudVoiceChange(id) }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                            if (id == cloudVoice) {
+                                Icon(Icons.Default.Check, null,
+                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TtsSliderRow("语速", cloudRate.removePrefix("+").removeSuffix("%").toFloatOrNull() ?: 0f, -50f, 50f) { v ->
+                        onCloudRateChange("${if (v >= 0) "+" else ""}${v.toInt()}%")
+                    }
+                    TtsSliderRow("音调", cloudPitch.removePrefix("+").removeSuffix("Hz").toFloatOrNull() ?: 0f, -20f, 20f) { v ->
+                        onCloudPitchChange("${if (v >= 0) "+" else ""}${v.toInt()}Hz")
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text("关闭")
+                }
+            }
+        }
     }
 }
 
