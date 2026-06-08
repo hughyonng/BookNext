@@ -535,6 +535,13 @@ class ReaderViewModel @Inject constructor(
 
             val cacheFile = File(context.filesDir, "books/${bookId}.${entity.format}")
             if (cacheFile.exists() && cacheFile.length() > 0) {
+                // TXT 转换缓存失效检测：源文件更新则删除旧缓存
+                if (entity.format == "txt") {
+                    val epubCache = File(context.cacheDir, "epub_from_txt_${bookId}.epub")
+                    if (epubCache.exists() && epubCache.lastModified() < cacheFile.lastModified()) {
+                        epubCache.delete()
+                    }
+                }
                 deliverFile(entity, cacheFile)
                 return@launch
             }
@@ -682,6 +689,28 @@ class ReaderViewModel @Inject constructor(
             if (entity.format in listOf("doc", "docx")) {
                 val extracted = extractWordToTxt(file, context, entity.bookId)
                 _state.value = ReaderState.Ready(extracted ?: file, "txt")
+            } else if (entity.format == "txt") {
+                val epubCache = File(context.cacheDir, "epub_from_txt_${entity.bookId}.epub")
+                val epubFile = if (epubCache.exists() && epubCache.length() > 0) {
+                    epubCache
+                } else {
+                    try {
+                        com.booknext.app.util.TxtToEpubConverter.convert(
+                            txtFile = file,
+                            outputFile = epubCache,
+                            bookTitle = entity.title.ifEmpty { file.nameWithoutExtension },
+                            bookId = entity.bookId,
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("BookNext", "TXT→EPUB 失败，回退原始TXT: ${e.message}")
+                        null
+                    }
+                }
+                if (epubFile != null) {
+                    _state.value = ReaderState.Ready(epubFile, "epub")
+                } else {
+                    _state.value = ReaderState.Ready(file, "txt")
+                }
             } else {
                 _state.value = ReaderState.Ready(file, entity.format)
             }
