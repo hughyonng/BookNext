@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import com.booknext.app.ui.reader.options.VisualOptions
 import com.booknext.app.ui.reader.options.ControlOptions
 import com.booknext.app.ui.reader.options.OtherOptions
+import android.provider.Settings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
@@ -325,9 +326,11 @@ class ReaderViewModel @Inject constructor(
     }
     fun setUseLocalTts(v: Boolean) { _useLocalTts.value = v }
     fun openTtsSettings() {
-        val intent = android.content.Intent("com.android.settings.action.TTS_SETTINGS")
-        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        try {
+            val i = android.content.Intent("android.settings.TTS_SETTINGS")
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(i)
+        } catch (_: Exception) {}
     }
 
     fun startTts(text: String) {
