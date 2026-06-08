@@ -240,21 +240,13 @@ class ReaderViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OtherOptions())
 
-    // ── TTS 引擎 ──────────────────────────────────────────────
-    data class TtsEngineEntry(
-        val id: String,
-        val label: String,
-        val type: EngineType,
-    )
-    enum class EngineType { CLOUD, LOCAL }
-
+    // ── TTS ─────────────────────────────────────────────────────
     private val _ttsPlaying = MutableStateFlow(false)
     val ttsPlaying: StateFlow<Boolean> = _ttsPlaying
     private val _ttsLoading = MutableStateFlow(false)
     val ttsLoading: StateFlow<Boolean> = _ttsLoading
     private var cloudPlayer: MediaPlayer? = null
     private var localTts: TextToSpeech? = null
-    private var localTtsReady = false
     private var pendingTtsText: String? = null
 
     private val _bookmarks = MutableStateFlow<List<Int>>(emptyList())
@@ -301,11 +293,6 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { annotationDao.deleteById(id) }
     }
 
-    private val _availableEngines = MutableStateFlow<List<TtsEngineEntry>>(emptyList())
-    val availableEngines: StateFlow<List<TtsEngineEntry>> = _availableEngines
-
-    private val _ttsEngineId = MutableStateFlow("cloud")
-    val ttsEngineId: StateFlow<String> = _ttsEngineId
     private val _ttsCloudVoice = MutableStateFlow("zh-CN-XiaoxiaoNeural")
     val ttsCloudVoice: StateFlow<String> = _ttsCloudVoice
     private val _ttsCloudRate = MutableStateFlow("+0%")
@@ -313,38 +300,17 @@ class ReaderViewModel @Inject constructor(
     private val _ttsCloudPitch = MutableStateFlow("+0Hz")
     val ttsCloudPitch: StateFlow<String> = _ttsCloudPitch
 
+    private val _useLocalTts = MutableStateFlow(false)
+    val useLocalTts: StateFlow<Boolean> = _useLocalTts
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            discoverEngines()
-            _ttsEngineId.value = prefs.ttsEngineId.first()
             _ttsCloudVoice.value = prefs.ttsCloudVoice.first()
             _ttsCloudRate.value = prefs.ttsCloudRate.first()
             _ttsCloudPitch.value = prefs.ttsCloudPitch.first()
         }
     }
 
-    private fun discoverEngines() {
-        val list = mutableListOf(TtsEngineEntry("cloud", "云端引擎（微软）", EngineType.CLOUD))
-        try {
-            val intent = android.content.Intent(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA)
-            val resolveList = context.packageManager.queryIntentActivities(intent, 0)
-            resolveList.forEach { ri ->
-                val pkg = ri.activityInfo.packageName
-                val label = ri.loadLabel(context.packageManager).toString()
-                list.add(TtsEngineEntry(pkg, label, EngineType.LOCAL))
-            }
-        } catch (_: Exception) {}
-        if (list.size == 1) {
-            // 没有扫描到任何引擎，至少加一个默认引擎入口
-            list.add(TtsEngineEntry("", "系统默认引擎", EngineType.LOCAL))
-        }
-        _availableEngines.value = list
-    }
-
-    fun setTtsEngine(id: String) {
-        _ttsEngineId.value = id
-        viewModelScope.launch { prefs.saveTtsEngineId(id) }
-    }
     fun setTtsCloudVoice(voice: String) {
         _ttsCloudVoice.value = voice
         viewModelScope.launch { prefs.saveTtsCloudVoice(voice) }
@@ -357,15 +323,18 @@ class ReaderViewModel @Inject constructor(
         _ttsCloudPitch.value = pitch
         viewModelScope.launch { prefs.saveTtsCloudPitch(pitch) }
     }
+    fun setUseLocalTts(v: Boolean) { _useLocalTts.value = v }
+    fun openTtsSettings() {
+        val intent = android.content.Intent("com.android.settings.action.TTS_SETTINGS")
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
 
     fun startTts(text: String) {
-        val engine = _availableEngines.value.find { it.id == _ttsEngineId.value }
-        if (engine == null) { _ttsPlaying.value = true; _ttsPlaying.value = false; return }
-
-        if (engine.type == EngineType.CLOUD) {
-            startCloudTts(text)
+        if (_useLocalTts.value) {
+            startLocalTts(text)
         } else {
-            startLocalTts(text, engine.id)
+            startCloudTts(text)
         }
     }
 
@@ -375,19 +344,25 @@ class ReaderViewModel @Inject constructor(
         val safe = text.take(3800)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val req = com.booknext.app.data.remote.dto.TtsRequest(
-                    text = safe,
-                    voice = _ttsCloudVoice.value,
-                    rate = _ttsCloudRate.value,
-                    pitch = _ttsCloudPitch.value,
-                )
-                val responseBody = apiClient.api().tts(req)
-                val tmpFile = File(context.cacheDir, "tts_tmp.mp3")
-                tmpFile.outputStream().use { out -> responseBody.byteStream().use { inp -> inp.copyTo(out) } }
+                val serverUrl = prefs.serverUrl.first().trimEnd('/')
+                val apiKey = prefs.apiKey.first()
+                val voice = _ttsCloudVoice.value
+                val rate = _ttsCloudRate.value
+                val pitch = _ttsCloudPitch.value
+                val encodedText = java.net.URLEncoder.encode(safe, "UTF-8")
+                val streamUrl = "$serverUrl/api/tts/stream?text=$encodedText&voice=$voice&rate=$rate&pitch=$pitch&k=$apiKey"
+
+                // MediaPlayer 直接串流，边下边播
                 withContext(Dispatchers.Main) {
                     cloudPlayer?.release()
                     cloudPlayer = MediaPlayer().apply {
-                        setDataSource(tmpFile.absolutePath)
+                        setAudioAttributes(
+                            android.media.AudioAttributes.Builder()
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                .build()
+                        )
+                        setDataSource(streamUrl)
                         setOnPreparedListener { _ttsLoading.value = false; start() }
                         setOnCompletionListener { _ttsPlaying.value = false }
                         setOnErrorListener { _, what, extra ->
@@ -406,19 +381,15 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private fun startLocalTts(text: String, engineId: String) {
+    fun startLocalTts(text: String) {
         _ttsPlaying.value = true
-        // 销毁旧引擎重建，确保使用指定引擎
         localTts?.stop()
         localTts?.shutdown()
         localTts = null
-        localTtsReady = false
-
         val safe = safeTtsText(text)
         pendingTtsText = safe
-        localTts = TextToSpeech(context, { status ->
-            localTtsReady = true
-            android.util.Log.d("BookNext", "Local TTS init engine=$engineId status=$status")
+        localTts = TextToSpeech(context) { status ->
+            android.util.Log.d("BookNext", "Local TTS init status=$status")
             val pending = pendingTtsText ?: return@TextToSpeech
             pendingTtsText = null
             localTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -427,7 +398,7 @@ class ReaderViewModel @Inject constructor(
                 override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
             })
             try { localTts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts") } catch (_: Exception) {}
-        }, engineId.ifEmpty { null })
+        }
     }
 
     fun stopTts() {

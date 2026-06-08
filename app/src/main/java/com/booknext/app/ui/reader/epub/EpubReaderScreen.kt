@@ -86,15 +86,15 @@ fun EpubReaderScreen(
     stopTts: () -> Unit = {},
     ttsLoading: Boolean = false,
     // TTS 引擎设置
-    ttsEngineList: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry> = emptyList(),
-    ttsEngineId: String = "cloud",
-    onTtsEngineChange: (String) -> Unit = {},
     ttsCloudVoice: String = "zh-CN-XiaoxiaoNeural",
     onTtsCloudVoiceChange: (String) -> Unit = {},
     ttsCloudRate: String = "+0%",
     onTtsCloudRateChange: (String) -> Unit = {},
     ttsCloudPitch: String = "+0Hz",
     onTtsCloudPitchChange: (String) -> Unit = {},
+    onOpenTtsSettings: () -> Unit = {},
+    useLocalTts: Boolean = false,
+    onUseLocalTtsChange: (Boolean) -> Unit = {},
     onSaveSetting: (key: String, value: Any) -> Unit = { _, _ -> },
     onSetTranslateEngine: (String) -> Unit = {},
     onSetTranslateTargetLang: (String) -> Unit = {},
@@ -224,15 +224,15 @@ fun EpubReaderScreen(
                 }
             },
             onTtsStop = { epubTtsPlaying = false; stopTts() },
-            ttsEngineList = ttsEngineList,
-            ttsEngineId = ttsEngineId,
-            onTtsEngineChange = onTtsEngineChange,
             ttsCloudVoice = ttsCloudVoice,
             onTtsCloudVoiceChange = onTtsCloudVoiceChange,
             ttsCloudRate = ttsCloudRate,
             onTtsCloudRateChange = onTtsCloudRateChange,
             ttsCloudPitch = ttsCloudPitch,
             onTtsCloudPitchChange = onTtsCloudPitchChange,
+            onOpenTtsSettings = onOpenTtsSettings,
+            useLocalTts = useLocalTts,
+            onUseLocalTtsChange = onUseLocalTtsChange,
             onTocJump = { idx ->
                 val nav = epubNavigatorRef
                 val pub = epubPublicationRef

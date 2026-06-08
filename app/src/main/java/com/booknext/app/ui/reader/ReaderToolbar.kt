@@ -115,16 +115,16 @@ fun ReaderToolbarOverlay(
     onDictionaryLookup: () -> Unit = {},
     onSetReaderBgColor: (String) -> Unit = {},
     readerBgColor: String = "",
-    // TTS 引擎设置
-    ttsEngineList: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry> = emptyList(),
-    ttsEngineId: String = "cloud",
-    onTtsEngineChange: (String) -> Unit = {},
+    // TTS 设置
     ttsCloudVoice: String = "zh-CN-XiaoxiaoNeural",
     onTtsCloudVoiceChange: (String) -> Unit = {},
     ttsCloudRate: String = "+0%",
     onTtsCloudRateChange: (String) -> Unit = {},
     ttsCloudPitch: String = "+0Hz",
     onTtsCloudPitchChange: (String) -> Unit = {},
+    useLocalTts: Boolean = false,
+    onUseLocalTtsChange: (Boolean) -> Unit = {},
+    onOpenTtsSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -425,15 +425,15 @@ fun ReaderToolbarOverlay(
 
         if (showTtsSettings) {
             TtsSettingsDialog(
-                engines = ttsEngineList,
-                currentEngineId = ttsEngineId,
-                onEngineChange = { onTtsEngineChange(it); showTtsSettings = false },
                 cloudVoice = ttsCloudVoice,
                 onCloudVoiceChange = onTtsCloudVoiceChange,
                 cloudRate = ttsCloudRate,
                 onCloudRateChange = onTtsCloudRateChange,
                 cloudPitch = ttsCloudPitch,
                 onCloudPitchChange = onTtsCloudPitchChange,
+                useLocalTts = useLocalTts,
+                onUseLocalTtsChange = onUseLocalTtsChange,
+                onOpenTtsSettings = onOpenTtsSettings,
                 onDismiss = { showTtsSettings = false },
             )
         }
@@ -703,84 +703,101 @@ private fun TtsSliderRow(
 
 @Composable
 private fun TtsSettingsDialog(
-    engines: List<com.booknext.app.ui.reader.ReaderViewModel.TtsEngineEntry>,
-    currentEngineId: String,
-    onEngineChange: (String) -> Unit,
     cloudVoice: String,
     onCloudVoiceChange: (String) -> Unit,
     cloudRate: String,
     onCloudRateChange: (String) -> Unit,
     cloudPitch: String,
     onCloudPitchChange: (String) -> Unit,
+    useLocalTts: Boolean = false,
+    onUseLocalTtsChange: (Boolean) -> Unit = {},
+    onOpenTtsSettings: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val currentEngine = engines.find { it.id == currentEngineId }
-    val isCloud = currentEngine?.type == com.booknext.app.ui.reader.ReaderViewModel.EngineType.CLOUD
-
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(12.dp), tonalElevation = 6.dp) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("朗读引擎", style = MaterialTheme.typography.titleMedium,
+                Text("朗读设置", style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 12.dp))
 
-                Text("选择引擎", style = MaterialTheme.typography.labelMedium,
+                // ── 手机引擎 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable {
+                            if (!useLocalTts) {
+                                onUseLocalTtsChange(true)
+                            }
+                            onOpenTtsSettings()
+                        }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.PhoneAndroid, null, tint = if (useLocalTts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column {
+                            Text("手机朗读引擎", style = MaterialTheme.typography.bodyLarge)
+                            Text("跳转系统文字转语音设置", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (useLocalTts) {
+                        Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (useLocalTts) {
+                    Text("已开启手机引擎，点击朗读将使用系统首选引擎", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 40.dp, bottom = 4.dp))
+                    TextButton(onClick = { onUseLocalTtsChange(false) }, modifier = Modifier.padding(start = 32.dp)) {
+                        Text("切换到云端引擎", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+
+                // ── 云端引擎 ──
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Cloud, null, tint = if (!useLocalTts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("云端引擎（微软）", style = MaterialTheme.typography.bodyLarge)
+                }
+                if (!useLocalTts) {
+
+                val voices = listOf(
+                    "zh-CN-XiaoxiaoNeural" to "晓晓（女声）",
+                    "zh-CN-YunyangNeural" to "云扬（男声）",
+                    "zh-CN-XiaoyiNeural" to "晓伊（女童）",
+                    "zh-CN-YunxiNeural" to "云希（男童）",
+                    "zh-CN-XiaohanNeural" to "晓涵（女声）",
+                    "en-US-JennyNeural" to "Jenny（英语）",
+                )
+                Text("发音人", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                engines.forEach { engine ->
+                voices.forEach { (id, label) ->
                     Row(
                         modifier = Modifier.fillMaxWidth()
-                            .clickable { onEngineChange(engine.id) }
-                            .padding(vertical = 8.dp),
+                            .clickable { onCloudVoiceChange(id) }
+                            .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(engine.label, style = MaterialTheme.typography.bodyLarge)
-                        if (engine.id == currentEngineId) {
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
+                        if (id == cloudVoice) {
                             Icon(Icons.Default.Check, null,
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }
                     }
-                    HorizontalDivider()
+                }
+                Spacer(Modifier.height(8.dp))
+                TtsSliderRow("语速", cloudRate.removePrefix("+").removeSuffix("%").toFloatOrNull() ?: 0f, -50f, 50f) { v ->
+                    onCloudRateChange("${if (v >= 0) "+" else ""}${v.toInt()}%")
+                }
+                TtsSliderRow("音调", cloudPitch.removePrefix("+").removeSuffix("Hz").toFloatOrNull() ?: 0f, -20f, 20f) { v ->
+                    onCloudPitchChange("${if (v >= 0) "+" else ""}${v.toInt()}Hz")
                 }
 
-                if (isCloud) {
-                    Spacer(Modifier.height(12.dp))
-                    Text("云端引擎设置", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-
-                    val voices = listOf(
-                        "zh-CN-XiaoxiaoNeural" to "晓晓（女声）",
-                        "zh-CN-YunyangNeural" to "云扬（男声）",
-                        "zh-CN-XiaoyiNeural" to "晓伊（女童）",
-                        "zh-CN-YunxiNeural" to "云希（男童）",
-                        "zh-CN-XiaohanNeural" to "晓涵（女声）",
-                        "en-US-JennyNeural" to "Jenny（英语）",
-                    )
-                    Text("发音人", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    voices.forEach { (id, label) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clickable { onCloudVoiceChange(id) }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(label, style = MaterialTheme.typography.bodyMedium)
-                            if (id == cloudVoice) {
-                                Icon(Icons.Default.Check, null,
-                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TtsSliderRow("语速", cloudRate.removePrefix("+").removeSuffix("%").toFloatOrNull() ?: 0f, -50f, 50f) { v ->
-                        onCloudRateChange("${if (v >= 0) "+" else ""}${v.toInt()}%")
-                    }
-                    TtsSliderRow("音调", cloudPitch.removePrefix("+").removeSuffix("Hz").toFloatOrNull() ?: 0f, -20f, 20f) { v ->
-                        onCloudPitchChange("${if (v >= 0) "+" else ""}${v.toInt()}Hz")
-                    }
                 }
 
                 Spacer(Modifier.height(16.dp))

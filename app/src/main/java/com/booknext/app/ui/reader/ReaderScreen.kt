@@ -56,12 +56,11 @@ fun ReaderScreen(
     val readerControlOptions by viewModel.controlOptions.collectAsState()
     val readerOtherOptions by viewModel.otherOptions.collectAsState()
     val readerBgColor by viewModel.bgColor.collectAsState()
-    val ttsEngineList by viewModel.availableEngines.collectAsState()
-    val ttsEngineId by viewModel.ttsEngineId.collectAsState()
     val ttsCloudVoice by viewModel.ttsCloudVoice.collectAsState()
     val ttsCloudRate by viewModel.ttsCloudRate.collectAsState()
     val ttsCloudPitch by viewModel.ttsCloudPitch.collectAsState()
     val ttsLoading by viewModel.ttsLoading.collectAsState()
+    val useLocalTts by viewModel.useLocalTts.collectAsState()
 
     val context = LocalContext.current
     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -188,15 +187,15 @@ fun ReaderScreen(
                             isTtsPlaying = ttsPlaying,
                             stopTts = { viewModel.stopTts() },
                             ttsLoading = ttsLoading,
-                            ttsEngineList = ttsEngineList,
-                            ttsEngineId = ttsEngineId,
-                            onTtsEngineChange = { viewModel.setTtsEngine(it) },
                             ttsCloudVoice = ttsCloudVoice,
                             onTtsCloudVoiceChange = { viewModel.setTtsCloudVoice(it) },
                             ttsCloudRate = ttsCloudRate,
                             onTtsCloudRateChange = { viewModel.setTtsCloudRate(it) },
                             ttsCloudPitch = ttsCloudPitch,
                             onTtsCloudPitchChange = { viewModel.setTtsCloudPitch(it) },
+                            onOpenTtsSettings = { viewModel.openTtsSettings() },
+                            useLocalTts = useLocalTts,
+                            onUseLocalTtsChange = { viewModel.setUseLocalTts(it) },
                             onSaveSetting = onSaveSetting,
                             onSetTranslateEngine = { viewModel.setTranslateEngine(it) },
                             onSetTranslateTargetLang = { viewModel.setTranslateTargetLang(it) },
