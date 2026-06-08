@@ -8,6 +8,7 @@ import com.booknext.app.data.remote.dto.AuthRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -30,6 +31,15 @@ class LoginViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(LoginState())
     val state: StateFlow<LoginState> = _state
+
+    init {
+        viewModelScope.launch {
+            val savedUrl = prefs.serverUrl.first()
+            if (savedUrl.isNotBlank()) {
+                _state.value = _state.value.copy(serverUrl = savedUrl)
+            }
+        }
+    }
 
     fun onUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v) }
     fun onKeyChange(v: String) { _state.value = _state.value.copy(apiKey = v) }

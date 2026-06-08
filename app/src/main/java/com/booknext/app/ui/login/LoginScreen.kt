@@ -3,6 +3,7 @@ package com.booknext.app.ui.login
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +50,13 @@ fun LoginScreen(
                 placeholder = { Text("https://xxx.hf.space") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                trailingIcon = {
+                    if (state.serverUrl.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onUrlChange("") }) {
+                            Icon(Icons.Default.Close, "清除地址")
+                        }
+                    }
+                },
             )
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(

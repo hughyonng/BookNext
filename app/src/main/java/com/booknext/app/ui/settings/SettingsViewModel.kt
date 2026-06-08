@@ -110,7 +110,7 @@ class SettingsViewModel @Inject constructor(
 
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
-            prefs.clear()
+            prefs.saveApiKey("")
             onDone()
         }
     }

@@ -102,7 +102,7 @@ class MainActivity : FragmentActivity() {
                             },
                             onLogout = {
                                 scope.launch {
-                                    prefs.clear()
+                                    prefs.saveApiKey("")
                                     recreate()
                                 }
                             },

@@ -187,6 +187,10 @@ class UserPreferences @Inject constructor(
         }
     }
 
+    suspend fun saveApiKey(key: String) {
+        context.dataStore.edit { it[API_KEY] = key }
+    }
+
     suspend fun saveDarkMode(enabled: Boolean) {
         context.dataStore.edit { it[DARK_MODE] = enabled }
     }
