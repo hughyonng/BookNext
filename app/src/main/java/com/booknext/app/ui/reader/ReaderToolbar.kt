@@ -651,8 +651,6 @@ private fun TtsControlPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "停止") }
-            IconButton(onClick = {}) { Icon(Icons.Default.SkipPrevious, "上一句") }
-            IconButton(onClick = {}) { Icon(Icons.Default.FastRewind, "快退") }
             IconButton(onClick = onTogglePlay, modifier = Modifier.size(48.dp)) {
                 Icon(
                     if (isTtsPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -661,8 +659,6 @@ private fun TtsControlPanel(
                     modifier = Modifier.size(32.dp),
                 )
             }
-            IconButton(onClick = {}) { Icon(Icons.Default.FastForward, "快进") }
-            IconButton(onClick = {}) { Icon(Icons.Default.SkipNext, "下一句") }
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "设置") }
         }
     }
