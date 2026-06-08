@@ -411,30 +411,53 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    private var localTtsEngines: List<String>? = null
+
     fun startLocalTts(text: String) {
         _ttsPlaying.value = true
         localTts?.stop()
         localTts?.shutdown()
         localTts = null
 
-        // 读取系统设置的默认TTS引擎包名
-        var enginePkg: String? = null
-        try {
-            enginePkg = android.provider.Settings.Secure.getString(
-                context.contentResolver, "tts_default_synth"
-            )
-            android.util.Log.d("BookNext", "TTS default engine from settings: $enginePkg")
-        } catch (_: Exception) {}
+        // 枚举系统中所有TTS引擎包名
+        val engines = localTtsEngines ?: run {
+            val list = mutableListOf<String>()
+            try {
+                val intent = android.content.Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE)
+                val resolveList = context.packageManager.queryIntentServices(intent, 0)
+                resolveList.forEach { info ->
+                    list.add(info.serviceInfo.packageName)
+                }
+            } catch (_: Exception) {}
+            // 再加一个系统默认引擎的空入口
+            if (list.isEmpty()) list.add("")
+            localTtsEngines = list
+            list
+        }
+        android.util.Log.d("BookNext", "TTS engines: $engines")
 
         val safe = safeTtsText(text)
         pendingTtsText = safe
+        tryEngine(text, safe, engines, 0)
+    }
+
+    private fun tryEngine(text: String, safe: String, engines: List<String>, index: Int) {
+        if (index >= engines.size) {
+            android.util.Log.e("BookNext", "All TTS engines failed")
+            _ttsPlaying.value = false
+            return
+        }
+        val pkg = engines[index]
+        pendingTtsText = safe
         localTts = TextToSpeech(context, { status ->
-            android.util.Log.d("BookNext", "Local TTS init status=$status engine=$enginePkg")
+            android.util.Log.d("BookNext", "TTS engine [$pkg] init=$status")
             if (status != TextToSpeech.SUCCESS) {
-                android.util.Log.e("BookNext", "Local TTS init failed status=$status")
-                _ttsPlaying.value = false
+                localTts?.shutdown()
+                localTts = null
+                tryEngine(text, safe, engines, index + 1)
                 return@TextToSpeech
             }
+            android.util.Log.d("BookNext", "TTS engine [$pkg] ready, speaking ${safe.length} chars")
             val pending = pendingTtsText ?: return@TextToSpeech
             pendingTtsText = null
             localTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -449,7 +472,7 @@ class ReaderViewModel @Inject constructor(
                 android.util.Log.e("BookNext", "TTS speak error: ${e.message}")
                 _ttsPlaying.value = false
             }
-        }, enginePkg?.ifEmpty { null })
+        }, pkg.ifEmpty { null })
     }
 
     fun stopTts() {

@@ -732,12 +732,8 @@ private fun TtsSettingsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.PhoneAndroid, null, tint = if (useLocalTts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                        Column {
-                            Text("手机朗读引擎", style = MaterialTheme.typography.bodyLarge)
-                            Text("跳转系统文字转语音设置", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        Icon(Icons.Default.PhoneAndroid, null, tint = MaterialTheme.colorScheme.primary)
+                        Text("手机朗读引擎", style = MaterialTheme.typography.bodyLarge)
                     }
                     if (useLocalTts) {
                         Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
@@ -746,22 +742,37 @@ private fun TtsSettingsDialog(
                     }
                 }
                 if (useLocalTts) {
-                    Text("已开启手机引擎，点击朗读将使用系统首选引擎", fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 40.dp, bottom = 4.dp))
-                    TextButton(onClick = { onUseLocalTtsChange(false) }, modifier = Modifier.padding(start = 32.dp)) {
-                        Text("切换到云端引擎", style = MaterialTheme.typography.labelSmall)
+                    Text("当前引擎：系统首选 · 点击跳转设置更换", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 40.dp, bottom = 4.dp))
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // ── 云端引擎 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable { onUseLocalTtsChange(false) }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Cloud, null, tint = if (!useLocalTts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column {
+                            Text("云端引擎（微软）", style = MaterialTheme.typography.bodyLarge)
+                            if (!useLocalTts) {
+                                Text("当前引擎", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                    if (!useLocalTts) {
+                        Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-
-                // ── 云端引擎 ──
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Cloud, null, tint = if (!useLocalTts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("云端引擎（微软）", style = MaterialTheme.typography.bodyLarge)
-                }
                 if (!useLocalTts) {
+                    Spacer(Modifier.height(8.dp))
 
                 val voices = listOf(
                     "zh-CN-XiaoxiaoNeural" to "晓晓（女声）",
