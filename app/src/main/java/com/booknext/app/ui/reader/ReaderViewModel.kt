@@ -412,6 +412,11 @@ class ReaderViewModel @Inject constructor(
     }
 
     private var localTtsEngines: List<String>? = null
+    private var activityRef: android.app.Activity? = null
+
+    fun setActivity(activity: android.app.Activity) {
+        activityRef = activity
+    }
 
     fun startLocalTts(text: String) {
         _ttsPlaying.value = true
@@ -419,46 +424,50 @@ class ReaderViewModel @Inject constructor(
         localTts?.shutdown()
         localTts = null
 
-        // 枚举系统中所有TTS引擎包名
+        // 引擎列表
         val engines = localTtsEngines ?: run {
             val list = mutableListOf<String>()
             try {
                 val intent = android.content.Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE)
-                val resolveList = context.packageManager.queryIntentServices(intent, 0)
-                resolveList.forEach { info ->
-                    list.add(info.serviceInfo.packageName)
+                context.packageManager.queryIntentServices(intent, 0).forEach {
+                    list.add(it.serviceInfo.packageName)
                 }
             } catch (_: Exception) {}
-            // 再加一个系统默认引擎的空入口
+            listOfNotNull(
+                android.provider.Settings.Secure.getString(context.contentResolver, "tts_default_synth"),
+                "com.iflytek.vflynote", "com.iflytek.tts",
+                "com.iflytek.speechcloud", "com.baidu.tts",
+            ).filter { it !in list }.let { list.addAll(it) }
             if (list.isEmpty()) list.add("")
-            localTtsEngines = list
-            list
+            localTtsEngines = list.distinct()
+            list.distinct()
         }
-        android.util.Log.d("BookNext", "TTS engines: $engines")
 
-        val safe = safeTtsText(text)
-        pendingTtsText = safe
-        tryEngine(text, safe, engines, 0)
+        // 先用 Application context 试,不行再用 Activity context
+        val actCtx = activityRef
+        val ctxList = if (actCtx != null) listOf(context, actCtx) else listOf(context)
+
+        tryEnginesMultiCtx(text, safeTtsText(text), engines, ctxList, 0, 0)
     }
 
-    private fun tryEngine(text: String, safe: String, engines: List<String>, index: Int) {
-        if (index >= engines.size) {
-            android.util.Log.e("BookNext", "All TTS engines failed")
-            _ttsPlaying.value = false
+    private fun tryEnginesMultiCtx(text: String, safe: String, engines: List<String>, ctxs: List<android.content.Context>, eIdx: Int, cIdx: Int) {
+        if (cIdx >= ctxs.size) { _ttsPlaying.value = false; return }
+        if (eIdx >= engines.size) {
+            tryEnginesMultiCtx(text, safe, engines, ctxs, 0, cIdx + 1)
             return
         }
-        val pkg = engines[index]
+        val pkg = engines[eIdx]
+        val ctx = ctxs[cIdx]
         pendingTtsText = safe
-        localTts = TextToSpeech(context, { status ->
-            android.util.Log.d("BookNext", "TTS engine [$pkg] init=$status")
+        localTts = TextToSpeech(ctx, { status ->
+            android.util.Log.d("BookNext", "TTS engine [$pkg] ctx[$cIdx] init=$status")
             if (status != TextToSpeech.SUCCESS) {
                 localTts?.shutdown()
                 localTts = null
-                tryEngine(text, safe, engines, index + 1)
+                tryEnginesMultiCtx(text, safe, engines, ctxs, eIdx + 1, cIdx)
                 return@TextToSpeech
             }
-            android.util.Log.d("BookNext", "TTS engine [$pkg] ready, speaking ${safe.length} chars")
-            val pending = pendingTtsText ?: return@TextToSpeech
+            android.util.Log.d("BookNext", "TTS engine [$pkg] ready! speaking ${safe.length} chars")
             pendingTtsText = null
             localTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}

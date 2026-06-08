@@ -81,6 +81,7 @@ fun ReaderScreen(
         viewModel.loadBook(bookId)
         viewModel.loadAnnotations(bookId)
         viewModel.loadSessions(bookId)
+        (context as? android.app.Activity)?.let { viewModel.setActivity(it) }
     }
 
     LaunchedEffect(keepScreenOnPref) {
