@@ -385,6 +385,11 @@ class ReaderViewModel @Inject constructor(
                 if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
                     langResult = tts?.setLanguage(Locale.CHINA) ?: TextToSpeech.LANG_NOT_SUPPORTED
                     android.util.Log.d("BookNext", "TTS setLanguage(CHINA)=$langResult")
+                    if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        // fallback: use system default locale
+                        tts?.setLanguage(Locale.getDefault())
+                        android.util.Log.d("BookNext", "TTS setLanguage(default)=${Locale.getDefault()}")
+                    }
                 }
                 val pending = pendingTtsText
                 pendingTtsText = null
@@ -401,6 +406,7 @@ class ReaderViewModel @Inject constructor(
                 }
             } else {
                 pendingTtsText = null
+                _ttsPlaying.value = false
             }
         }
     }
@@ -423,6 +429,7 @@ class ReaderViewModel @Inject constructor(
             initTts()
         } else {
             pendingTtsText = safe
+            _ttsPlaying.value = true
         }
     }
 

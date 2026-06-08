@@ -115,6 +115,10 @@ fun EpubReaderScreen(
     var tocEntries by remember { mutableStateOf<List<TocEntry>>(emptyList()) }
     var epubTtsPlaying by remember { mutableStateOf(false) }
     var ttsChapterText by remember { mutableStateOf("") }
+    // 同步 ViewModel 的 TTS 状态到本地状态（朗读完成时自动关闭切换开关）
+    LaunchedEffect(isTtsPlaying) {
+        epubTtsPlaying = isTtsPlaying
+    }
     // 浮层按钮状态
     var showFloatingMenu by remember { mutableStateOf(false) }
     var floatingText by remember { mutableStateOf("") }
@@ -647,7 +651,7 @@ private suspend fun openEpubPublication(
                         val html = bytes.toString(Charsets.UTF_8)
                         val text = html.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
                         android.util.Log.d("BookNext", "TTS: text length=${text.length}")
-                        if (text.length > 100) {
+                        if (text.length > 10) {
                             val safe = text.take(3000)
                             withContext(Dispatchers.Main) { onChapterText(safe) }
                         }
