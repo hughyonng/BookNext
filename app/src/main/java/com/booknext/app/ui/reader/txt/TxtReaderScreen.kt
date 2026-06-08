@@ -116,6 +116,17 @@ fun TxtReaderScreen(
     onAddBookmark: (Int) -> Unit = {},
     onOrientationChange: (String) -> Unit = {},
     onBrightnessChange: (Float) -> Unit = {},
+    // TTS 引擎设置
+    ttsCloudVoice: String = "zh-CN-XiaoxiaoNeural",
+    onTtsCloudVoiceChange: (String) -> Unit = {},
+    ttsCloudRate: String = "+0%",
+    onTtsCloudRateChange: (String) -> Unit = {},
+    ttsCloudPitch: String = "+0Hz",
+    onTtsCloudPitchChange: (String) -> Unit = {},
+    useLocalTts: Boolean = false,
+    onUseLocalTtsChange: (Boolean) -> Unit = {},
+    onOpenTtsSettings: () -> Unit = {},
+    ttsLoading: Boolean = false,
 ) {
     val rawLines by produceState<List<String>>(emptyList(), file) {
         value = withContext(Dispatchers.IO) { EncodingDetector.readLines(file) }
@@ -379,6 +390,7 @@ fun TxtReaderScreen(
                 tocEntries = tocEntries,
                 bookmarks = bookmarks,
                 isTtsPlaying = isTtsPlaying,
+                isTtsLoading = ttsLoading,
                 showStatusBar = showStatusBar,
                 showNavBar = showNavBar,
                 showProgressBar = showProgressBar,
@@ -441,6 +453,15 @@ fun TxtReaderScreen(
             onDictionaryLookup = onDictionaryLookup,
             onSetReaderBgColor = onSetReaderBgColor,
             readerBgColor = readerBgColor,
+            ttsCloudVoice = ttsCloudVoice,
+            onTtsCloudVoiceChange = onTtsCloudVoiceChange,
+            ttsCloudRate = ttsCloudRate,
+            onTtsCloudRateChange = onTtsCloudRateChange,
+            ttsCloudPitch = ttsCloudPitch,
+            onTtsCloudPitchChange = onTtsCloudPitchChange,
+            useLocalTts = useLocalTts,
+            onUseLocalTtsChange = onUseLocalTtsChange,
+            onOpenTtsSettings = onOpenTtsSettings,
         )
 
         // 搜索结果覆盖层
