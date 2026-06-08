@@ -724,9 +724,7 @@ private fun TtsSettingsDialog(
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clickable {
-                            if (!useLocalTts) {
-                                onUseLocalTtsChange(true)
-                            }
+                            onUseLocalTtsChange(true)
                             onOpenTtsSettings()
                         }
                         .padding(vertical = 10.dp),

@@ -326,8 +326,21 @@ class ReaderViewModel @Inject constructor(
     }
     fun setUseLocalTts(v: Boolean) { _useLocalTts.value = v }
     fun openTtsSettings() {
+        val tried = listOf(
+            "com.android.settings.TTS_SETTINGS",
+            android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            "android.settings.TTS_SETTINGS",
+        )
+        for (action in tried) {
+            try {
+                val i = android.content.Intent(action)
+                i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(i)
+                return
+            } catch (_: Exception) {}
+        }
         try {
-            val i = android.content.Intent("android.settings.TTS_SETTINGS")
+            val i = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
             i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(i)
         } catch (_: Exception) {}
@@ -347,39 +360,53 @@ class ReaderViewModel @Inject constructor(
         val safe = text.take(3800)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val serverUrl = prefs.serverUrl.first().trimEnd('/')
-                val apiKey = prefs.apiKey.first()
                 val voice = _ttsCloudVoice.value
                 val rate = _ttsCloudRate.value
                 val pitch = _ttsCloudPitch.value
-                val encodedText = java.net.URLEncoder.encode(safe, "UTF-8")
-                val streamUrl = "$serverUrl/api/tts/stream?text=$encodedText&voice=$voice&rate=$rate&pitch=$pitch&k=$apiKey"
+                val req = com.booknext.app.data.remote.dto.TtsRequest(
+                    text = safe, voice = voice, rate = rate, pitch = pitch
+                )
+                val body = apiClient.api().tts(req)
+                val bytes = body.bytes()
 
-                // MediaPlayer 直接串流，边下边播
                 withContext(Dispatchers.Main) {
-                    cloudPlayer?.release()
-                    cloudPlayer = MediaPlayer().apply {
-                        setAudioAttributes(
-                            android.media.AudioAttributes.Builder()
-                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                                .build()
-                        )
-                        setDataSource(streamUrl)
-                        setOnPreparedListener { _ttsLoading.value = false; start() }
-                        setOnCompletionListener { _ttsPlaying.value = false }
-                        setOnErrorListener { _, what, extra ->
-                            _ttsLoading.value = false
-                            _ttsPlaying.value = false
-                            android.util.Log.e("BookNext", "MediaPlayer error what=$what extra=$extra"); true
+                    try {
+                        cloudPlayer?.release()
+                        val tempFile = java.io.File(context.cacheDir, "tts_${System.currentTimeMillis()}.mp3")
+                        tempFile.writeBytes(bytes)
+                        cloudPlayer = MediaPlayer().apply {
+                            setAudioAttributes(
+                                android.media.AudioAttributes.Builder()
+                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                    .build()
+                            )
+                            setDataSource(tempFile.absolutePath)
+                            setOnPreparedListener {
+                                _ttsLoading.value = false
+                                start()
+                            }
+                            setOnCompletionListener { _ttsPlaying.value = false }
+                            setOnErrorListener { _, what, extra ->
+                                _ttsLoading.value = false
+                                _ttsPlaying.value = false
+                                android.util.Log.e("BookNext", "MediaPlayer error what=$what extra=$extra")
+                                true
+                            }
+                            prepare()
                         }
-                        prepareAsync()
+                    } catch (e: Exception) {
+                        android.util.Log.e("BookNext", "MediaPlayer setup: ${e.message}", e)
+                        _ttsLoading.value = false
+                        _ttsPlaying.value = false
                     }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("BookNext", "Cloud TTS error: ${e.message}", e)
-                _ttsLoading.value = false
-                _ttsPlaying.value = false
+                withContext(Dispatchers.Main) {
+                    _ttsLoading.value = false
+                    _ttsPlaying.value = false
+                }
             }
         }
     }
@@ -393,6 +420,11 @@ class ReaderViewModel @Inject constructor(
         pendingTtsText = safe
         localTts = TextToSpeech(context) { status ->
             android.util.Log.d("BookNext", "Local TTS init status=$status")
+            if (status != TextToSpeech.SUCCESS) {
+                android.util.Log.e("BookNext", "Local TTS init failed status=$status")
+                _ttsPlaying.value = false
+                return@TextToSpeech
+            }
             val pending = pendingTtsText ?: return@TextToSpeech
             pendingTtsText = null
             localTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -400,7 +432,13 @@ class ReaderViewModel @Inject constructor(
                 override fun onDone(utteranceId: String?) { _ttsPlaying.value = false }
                 override fun onError(utteranceId: String?) { _ttsPlaying.value = false }
             })
-            try { localTts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts") } catch (_: Exception) {}
+            try {
+                val result = localTts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts_${System.currentTimeMillis()}")
+                android.util.Log.d("BookNext", "TTS speak result=$result")
+            } catch (e: Exception) {
+                android.util.Log.e("BookNext", "TTS speak error: ${e.message}")
+                _ttsPlaying.value = false
+            }
         }
     }
 
@@ -411,6 +449,11 @@ class ReaderViewModel @Inject constructor(
         pendingTtsText = null
         _ttsLoading.value = false
         _ttsPlaying.value = false
+        // 清理TTS缓存文件
+        try {
+            context.cacheDir.listFiles { f -> f.name.startsWith("tts_") && f.name.endsWith(".mp3") }
+                ?.forEach { it.delete() }
+        } catch (_: Exception) {}
     }
 
     private fun safeTtsText(text: String): String {
