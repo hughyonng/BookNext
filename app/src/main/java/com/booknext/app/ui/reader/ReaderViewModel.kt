@@ -477,6 +477,9 @@ class ReaderViewModel @Inject constructor(
             try {
                 val result = localTts?.speak(safe, TextToSpeech.QUEUE_FLUSH, null, "tts_${System.currentTimeMillis()}")
                 android.util.Log.d("BookNext", "TTS speak result=$result")
+                if (result == null || result == TextToSpeech.ERROR) {
+                    _ttsPlaying.value = false
+                }
             } catch (e: Exception) {
                 android.util.Log.e("BookNext", "TTS speak error: ${e.message}")
                 _ttsPlaying.value = false
